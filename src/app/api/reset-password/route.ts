@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { hashResetToken } from "@/lib/password-reset";
 
 const RESET_LIMIT = 10;
@@ -44,14 +44,6 @@ const resetPasswordSchema = z.object({
  *         description: Too many attempts — try again later
  */
 export async function POST(req: NextRequest) {
-  const rateLimit = await checkRateLimit("reset-password", getClientIp(req), RESET_LIMIT, RESET_WINDOW_MS);
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { message: "Too many attempts. Please try again later." },
-      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
-    );
-  }
-
   const body = await req.json().catch(() => null);
   const parsed = resetPasswordSchema.safeParse(body);
   if (!parsed.success) {
@@ -59,6 +51,17 @@ export async function POST(req: NextRequest) {
   }
 
   const { token, password } = parsed.data;
+
+  // Keyed by the token itself, not the caller's IP — a shared/unknown IP (e.g.
+  // every request from localhost in dev) would otherwise dump every reset attempt
+  // into one bucket and rate-limit unrelated people out.
+  const rateLimit = await checkRateLimit("reset-password", hashResetToken(token), RESET_LIMIT, RESET_WINDOW_MS);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { message: "Too many attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+    );
+  }
 
   const invalidLinkResponse = () =>
     NextResponse.json({ message: "This reset link is invalid, expired, or has already been used." }, { status: 400 });

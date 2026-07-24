@@ -3,7 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { generateApiKey } from "@/lib/api-keys";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { recordFailedLoginAndMaybeLock, resetFailedLoginAttempts } from "@/lib/account-lock";
 
 const loginSchema = z.object({
@@ -53,14 +53,6 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
  *         description: Too many login attempts — try again later
  */
 export async function POST(req: NextRequest) {
-  const ipRateLimit = await checkRateLimit("login-ip", getClientIp(req), LOGIN_LIMIT, LOGIN_WINDOW_MS);
-  if (!ipRateLimit.allowed) {
-    return NextResponse.json(
-      { message: "Too many login attempts. Please try again later." },
-      { status: 429, headers: { "Retry-After": String(ipRateLimit.retryAfterSeconds) } }
-    );
-  }
-
   const body = await req.json().catch(() => null);
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
