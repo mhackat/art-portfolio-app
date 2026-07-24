@@ -207,11 +207,32 @@ Changes land on `test` first, always:
 1. Commit locally, push to `test`
 2. Wait for the Preview deployment to reach `Ready` and do a quick smoke check
    (`vercel ls`, `vercel inspect <url> --logs`, hit the live Preview URL)
-3. Only once that's confirmed working, fast-forward `main` to `test` and push
-4. Confirm the Production deployment also reaches `Ready`
+3. Open a PR from `test` into `main`
+4. The **Prod deploy gate** GitHub Actions check
+   (`.github/workflows/prod-deploy-gate.yml`) runs the
+   [art-portfolio-api-tests](https://github.com/mhackat/art-portfolio-api-tests) suite
+   (everything except the `@admin`-tagged tests) against the `test` environment. It's a
+   required status check — the PR cannot be merged until it passes.
+5. Merge the PR once the check is green; confirm the Production deployment reaches `Ready`
 
-This isn't enforced by branch protection (kept simple, single-maintainer project) — it's
-just the process to follow. `main` should never be the first place a change lands.
+`main` should never be the first place a change lands, and — enforced by branch
+protection — nothing merges into it without the test suite passing against `test` first.
+
+**CI setup** (one-time, in this repo's GitHub Settings → Secrets and variables →
+Actions):
+
+| Secret | Value |
+| --- | --- |
+| `API_TESTS_REPO_TOKEN` | A PAT (fine-grained, read-only, scoped to `mhackat/art-portfolio-api-tests`) — that repo is private, so the workflow needs this to check it out |
+| `API_AUTOMATION_USERNAME` | The dedicated test-automation account's username on the `test` environment |
+| `API_AUTOMATION_EMAIL` | Its email |
+| `API_AUTOMATION_PASSWORD` | Its password |
+| `API_AUTOMATION_DISPLAY_NAME` | Its display name |
+
+The automation account doesn't need to be pre-created — the suite's setup step signs it
+up on first run if it doesn't exist yet, and reuses it on every run after. Branch
+protection on `main` (Settings → Branches) requires the "API tests (test environment)"
+check to pass before merging.
 
 ## Next steps
 
@@ -219,4 +240,4 @@ just the process to follow. `main` should never be the first place a change land
 - [x] Add `data-testid` attributes to key interactive elements for Playwright targeting
 - [x] Add image upload (S3/R2-compatible) instead of the placeholder `imageUrl` field
 - [x] Deploy to a hosting provider and wire up staging/prod
-- [ ] Build the Playwright suite (separate repo) against this API
+- [x] Build the Playwright suite (separate repo) against this API, and gate `main` merges on it

@@ -1,0 +1,57 @@
+name: Prod deploy gate
+
+# Vercel deploys Production the instant a commit lands on `main`, so the only
+# way to actually run the API test suite "before" that deploy is to gate the
+# merge itself. This runs on every PR targeting `main` and is wired up as a
+# required status check in branch protection — see README.md "Push workflow".
+#
+# Runs everything except the admin tests (see art-portfolio-api-tests'
+# tests/admin/admin.spec.ts, tagged @admin) against the `test` environment
+# (art-portfolio-app-plumtest.vercel.app), never Production.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  api-tests:
+    name: API tests (test environment)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out art-portfolio-api-tests
+        uses: actions/checkout@v4
+        with:
+          repository: mhackat/art-portfolio-api-tests
+          ref: main
+          token: ${{ secrets.API_TESTS_REPO_TOKEN }}
+          path: api-tests
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: api-tests/package-lock.json
+
+      - name: Install dependencies
+        working-directory: api-tests
+        run: npm ci
+
+      - name: Run API tests against the test environment
+        working-directory: api-tests
+        env:
+          API_BASE_URL: https://art-portfolio-app-plumtest.vercel.app
+          API_AUTOMATION_USERNAME: ${{ secrets.API_AUTOMATION_USERNAME }}
+          API_AUTOMATION_EMAIL: ${{ secrets.API_AUTOMATION_EMAIL }}
+          API_AUTOMATION_PASSWORD: ${{ secrets.API_AUTOMATION_PASSWORD }}
+          API_AUTOMATION_DISPLAY_NAME: ${{ secrets.API_AUTOMATION_DISPLAY_NAME }}
+        run: npm run test:ci
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: api-tests/playwright-report
+          retention-days: 14
