@@ -41,7 +41,8 @@ export async function GET(req: NextRequest) {
 
   const users = await searchUsers(q, limit);
 
-  const publicUsers = users.map(({ displayName, latestArtworkImageUrl }) => ({
+  const publicUsers = users.map(({ username, displayName, latestArtworkImageUrl }) => ({
+    username,
     displayName,
     latestArtworkImageUrl,
   }));
