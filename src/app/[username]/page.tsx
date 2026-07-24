@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ArtworkGallery from "@/components/profile/ArtworkGallery";
 
+export const dynamic = "force-dynamic";
+
 export default async function PublicProfilePage({ params }: { params: { username: string } }) {
   const user = await prisma.user.findUnique({
     where: { username: params.username },
