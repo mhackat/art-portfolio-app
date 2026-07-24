@@ -184,17 +184,39 @@ Backing API, both admin-only (`GET`/`DELETE` require an admin session or API key
 ## Environments
 
 This app reads all config from environment variables (`DATABASE_URL`, `NEXTAUTH_SECRET`,
-`NEXTAUTH_URL`, `APP_ENV`). To stand up staging/prod:
+`NEXTAUTH_URL`, `STORAGE_*`, `ADMIN_EMAILS`, `APP_ENV`). Deployed on Vercel with two
+fully separate environments — separate Neon Postgres databases, separate R2 buckets,
+separate `NEXTAUTH_SECRET`s:
 
-1. Create a separate Postgres instance per environment (e.g. separate Neon or Supabase projects)
-2. Set the env vars in your hosting provider's dashboard (e.g. Vercel → Project → Settings → Environment Variables), scoped per environment
-3. Run `npx prisma migrate deploy` against each environment's `DATABASE_URL` when you deploy
-4. Run the seed script against staging (not prod) so Playwright has predictable fixtures
+- **`main`** branch → Production (`https://art-portfolio-app-plum.vercel.app`)
+- **`test`** branch → Preview, pinned to a stable domain (`https://art-portfolio-app-plumtest.vercel.app`)
+
+Env vars are set per-environment in Vercel → Project → Settings → Environment Variables.
+When adding a new one, set it for both Production and Preview (with different values
+where it matters, e.g. `DATABASE_URL`). Run `npx prisma migrate deploy` against each
+environment's `DATABASE_URL` after adding a migration, before or alongside deploying it.
+
+**Note:** `NEXTAUTH_URL` must include the `https://` scheme (not just the bare domain) —
+NextAuth uses it for callback/redirect handling, and Swagger UI's "Servers" dropdown
+treats a schemeless value as a relative path, silently producing broken doubled URLs.
+
+### Push workflow
+
+Changes land on `test` first, always:
+
+1. Commit locally, push to `test`
+2. Wait for the Preview deployment to reach `Ready` and do a quick smoke check
+   (`vercel ls`, `vercel inspect <url> --logs`, hit the live Preview URL)
+3. Only once that's confirmed working, fast-forward `main` to `test` and push
+4. Confirm the Production deployment also reaches `Ready`
+
+This isn't enforced by branch protection (kept simple, single-maintainer project) — it's
+just the process to follow. `main` should never be the first place a change lands.
 
 ## Next steps
 
 - [x] Build login / signup / dashboard / public gallery pages (Step 4 of the build plan)
 - [x] Add `data-testid` attributes to key interactive elements for Playwright targeting
 - [x] Add image upload (S3/R2-compatible) instead of the placeholder `imageUrl` field
-- [ ] Deploy to a hosting provider and wire up staging/prod
+- [x] Deploy to a hosting provider and wire up staging/prod
 - [ ] Build the Playwright suite (separate repo) against this API
