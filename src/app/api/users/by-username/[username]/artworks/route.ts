@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { requireOwnership } from "@/lib/authz";
+import { uploadImage } from "@/lib/storage";
+import { validateImageFile, isFileValidationError } from "@/lib/image-upload";
+
+const artworkFieldsSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional().default(""),
+});
+
+/**
+ * @swagger
+ * /api/users/by-username/{username}/artworks:
+ *   post:
+ *     summary: Add a new artwork to a user's gallery, by username
+ *     description: >
+ *       Only the authenticated owner of this username may add artworks to it. The
+ *       image is uploaded directly from the caller's device as part of this request.
+ *     tags: [Artworks]
+ *     security:
+ *       - apiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: username
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [title, file]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: PNG, JPEG, WEBP, or GIF, max 5MB
+ *     responses:
+ *       201:
+ *         description: Artwork created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Artwork'
+ *       400:
+ *         description: Invalid fields, missing file, unsupported file type, or file too large
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Authenticated but not the owner of this username
+ *       404:
+ *         description: User not found
+ *       503:
+ *         description: Image storage is not configured
+ */
+export async function POST(req: NextRequest, { params }: { params: { username: string } }) {
+  const user = await prisma.user.findUnique({ where: { username: params.username } });
+  if (!user) {
+    return NextResponse.json({ message: "User not found." }, { status: 404 });
+  }
+
+  const authz = await requireOwnership(req, user.id);
+  if (!authz.ok) {
+    return NextResponse.json({ message: authz.message }, { status: authz.status });
+  }
+
+  const form = await req.formData().catch(() => null);
+  if (!form) {
+    return NextResponse.json({ message: "Invalid form data." }, { status: 400 });
+  }
+
+  const file = validateImageFile(form.get("file"));
+  if (isFileValidationError(file)) {
+    return NextResponse.json({ message: file.message }, { status: 400 });
+  }
+
+  const title = form.get("title");
+  const description = form.get("description");
+  const parsed = artworkFieldsSchema.safeParse({
+    title: typeof title === "string" ? title : undefined,
+    description: typeof description === "string" ? description : undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json({ message: "Invalid request body.", issues: parsed.error.issues }, { status: 400 });
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  let imageUrl: string;
+  try {
+    imageUrl = await uploadImage(buffer, file.type, user.id);
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ message: "Image storage is not configured." }, { status: 503 });
+  }
+
+  const artwork = await prisma.artwork.create({
+    data: { ...parsed.data, imageUrl, userId: user.id },
+  });
+
+  return NextResponse.json(artwork, { status: 201 });
+}
