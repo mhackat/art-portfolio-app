@@ -6,11 +6,14 @@
     "node": "24.x"
   },
   "scripts": {
+    "predev": "tsx scripts/generate-openapi.ts",
     "dev": "next dev",
+    "prebuild": "tsx scripts/generate-openapi.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
+    "generate:openapi": "tsx scripts/generate-openapi.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
