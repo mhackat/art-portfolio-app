@@ -73,7 +73,7 @@ export default function AdminPasswordActions({ userId }: { userId: string }) {
         type="button"
         data-testid={`admin-password-actions-toggle-${userId}`}
         onClick={() => setExpanded(true)}
-        className="text-sm text-gray-700 hover:underline"
+        className="whitespace-nowrap text-base text-gray-700 hover:underline"
       >
         Password...
       </button>

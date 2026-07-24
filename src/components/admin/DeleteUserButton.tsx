@@ -39,7 +39,7 @@ export default function DeleteUserButton({ userId, displayName }: { userId: stri
         data-testid={`admin-delete-button-${userId}`}
         disabled={deleting}
         onClick={handleDelete}
-        className="text-sm text-red-600 hover:underline disabled:opacity-50"
+        className="whitespace-nowrap text-base text-red-600 hover:underline disabled:opacity-50"
       >
         {deleting ? "Deleting..." : "Delete"}
       </button>

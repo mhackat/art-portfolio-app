@@ -46,7 +46,7 @@ export default async function AdminPage({
   const { users: lockedUsers } = await listLockedUsersPaginated(1, LOCKED_PAGE_SIZE);
 
   return (
-    <main className="container mx-auto max-w-5xl px-6 py-16" data-testid="admin-page">
+    <main className="container mx-auto max-w-7xl px-6 py-16" data-testid="admin-page">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Admin — Users</h1>
@@ -92,7 +92,7 @@ export default async function AdminPage({
               <th className="py-2 pr-4">Artworks</th>
               <th className="py-2 pr-4">Joined</th>
               <th className="py-2 pr-4">Portfolio</th>
-              <th className="py-2">Actions</th>
+              <th className="py-2 min-w-[180px]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -112,8 +112,8 @@ export default async function AdminPage({
                     View
                   </Link>
                 </td>
-                <td className="py-2">
-                  <div className="flex flex-wrap items-center gap-3">
+                <td className="py-3">
+                  <div className="flex flex-col items-start gap-2">
                     <DeleteUserButton userId={user.id} displayName={user.displayName} />
                     {user.id !== userId ? (
                       <LockUserButton userId={user.id} displayName={user.displayName} />

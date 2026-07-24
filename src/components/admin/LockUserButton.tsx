@@ -39,7 +39,7 @@ export default function LockUserButton({ userId, displayName }: { userId: string
         data-testid={`admin-lock-button-${userId}`}
         disabled={locking}
         onClick={handleLock}
-        className="text-sm text-amber-700 hover:underline disabled:opacity-50"
+        className="whitespace-nowrap text-base text-amber-700 hover:underline disabled:opacity-50"
       >
         {locking ? "Locking..." : "Lock"}
       </button>
