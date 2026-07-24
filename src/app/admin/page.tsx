@@ -4,11 +4,9 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth-options";
 import { isAdminUserId } from "@/lib/authz";
 import { listUsersPaginated, listLockedUsersPaginated } from "@/lib/admin";
-import DeleteUserButton from "@/components/admin/DeleteUserButton";
-import LockUserButton from "@/components/admin/LockUserButton";
 import UnlockUserButton from "@/components/admin/UnlockUserButton";
-import AdminPasswordActions from "@/components/admin/AdminPasswordActions";
 import RevokeAllKeysButton from "@/components/admin/RevokeAllKeysButton";
+import ResizableUserTable from "@/components/admin/ResizableUserTable";
 
 const PAGE_SIZE = 50;
 const LOCKED_PAGE_SIZE = 50;
@@ -82,49 +80,8 @@ export default async function AdminPage({
       </section>
 
       <h2 className="mt-8 text-lg font-medium">All users</h2>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full border-collapse text-sm" data-testid="admin-user-table">
-          <thead>
-            <tr className="border-b border-gray-200 text-left text-gray-500">
-              <th className="py-2 pr-4">Display name</th>
-              <th className="py-2 pr-4">Username</th>
-              <th className="py-2 pr-4">Email</th>
-              <th className="py-2 pr-4">Artworks</th>
-              <th className="py-2 pr-4">Joined</th>
-              <th className="py-2 pr-4">Portfolio</th>
-              <th className="py-2 min-w-[180px]">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} data-testid={`admin-user-row-${user.id}`} className="border-b border-gray-100">
-                <td className="py-2 pr-4">{user.displayName}</td>
-                <td className="py-2 pr-4">@{user.username}</td>
-                <td className="py-2 pr-4">{user.email}</td>
-                <td className="py-2 pr-4">{user.artworkCount}</td>
-                <td className="py-2 pr-4">{formatDate(user.createdAt)}</td>
-                <td className="py-2 pr-4">
-                  <Link
-                    href={`/${user.username}`}
-                    data-testid={`admin-portfolio-link-${user.id}`}
-                    className="underline"
-                  >
-                    View
-                  </Link>
-                </td>
-                <td className="py-3">
-                  <div className="flex flex-col items-start gap-2">
-                    <DeleteUserButton userId={user.id} displayName={user.displayName} />
-                    {user.id !== userId ? (
-                      <LockUserButton userId={user.id} displayName={user.displayName} />
-                    ) : null}
-                    <AdminPasswordActions userId={user.id} />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-3">
+        <ResizableUserTable users={users} currentUserId={userId} />
       </div>
 
       <div className="mt-6 flex items-center justify-between text-sm">
