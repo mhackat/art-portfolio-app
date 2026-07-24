@@ -8,15 +8,19 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  username     String     @unique
-  passwordHash String
-  displayName  String
-  bio          String     @default("")
-  createdAt    DateTime   @default(now())
-  artworks     Artwork[]
-  apiKeys      ApiKey[]
+  id                   String               @id @default(cuid())
+  email                String               @unique
+  username             String               @unique
+  passwordHash         String
+  displayName          String
+  bio                  String               @default("")
+  createdAt            DateTime             @default(now())
+  failedLoginAttempts  Int                  @default(0)
+  lockedAt             DateTime?
+  lockReason           String?
+  artworks             Artwork[]
+  apiKeys              ApiKey[]
+  passwordResetTokens  PasswordResetToken[]
 }
 
 model Artwork {
@@ -50,4 +54,16 @@ model RateLimitHit {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+}
+
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  @@index([userId])
 }

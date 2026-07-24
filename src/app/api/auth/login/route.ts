@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { generateApiKey } from "@/lib/api-keys";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { recordFailedLoginAndMaybeLock, resetFailedLoginAttempts } from "@/lib/account-lock";
 
 const loginSchema = z.object({
   identifier: z.string().min(1),
@@ -46,6 +47,8 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
  *         description: Invalid body
  *       401:
  *         description: Invalid identifier or password
+ *       403:
+ *         description: Account is locked (either from too many failed attempts, or by an admin) — contact an admin to unlock it
  *       429:
  *         description: Too many login attempts — try again later
  */
@@ -90,10 +93,29 @@ export async function POST(req: NextRequest) {
     return invalidResponse();
   }
 
+  // Checked before comparing the password at all, so a locked account never
+  // authenticates even with the right password and leaks no password-correctness
+  // signal while locked.
+  if (user.lockedAt) {
+    return NextResponse.json(
+      { message: "This account has been locked. Contact an admin to unlock it." },
+      { status: 403 }
+    );
+  }
+
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
+    const { locked } = await recordFailedLoginAndMaybeLock(user.id);
+    if (locked) {
+      return NextResponse.json(
+        { message: "Too many failed attempts. This account has been locked." },
+        { status: 403 }
+      );
+    }
     return invalidResponse();
   }
+
+  await resetFailedLoginAttempts(user.id);
 
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
 

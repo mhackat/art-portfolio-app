@@ -26,6 +26,7 @@ export default function ArtworkManager({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -105,6 +106,31 @@ export default function ArtworkManager({
     }
   }
 
+  async function handleDeleteAll() {
+    const confirmed = window.confirm(
+      `Delete all ${artworks.length} artwork${artworks.length === 1 ? "" : "s"}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    setDeletingAll(true);
+
+    try {
+      const res = await fetch(`/api/users/by-username/${username}/artworks`, { method: "DELETE" });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.message ?? "Could not delete artworks.");
+        return;
+      }
+
+      setArtworks([]);
+      router.refresh();
+    } finally {
+      setDeletingAll(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleAdd} data-testid="artwork-form" className="space-y-3">
@@ -177,6 +203,18 @@ export default function ArtworkManager({
           {submitting ? "Uploading..." : "Add artwork"}
         </button>
       </form>
+
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          data-testid="artwork-delete-all-button"
+          disabled={deletingAll || artworks.length === 0}
+          onClick={handleDeleteAll}
+          className="text-sm text-red-600 hover:underline disabled:opacity-50"
+        >
+          {deletingAll ? "Deleting all..." : "Delete all artworks"}
+        </button>
+      </div>
 
       <ul data-testid="artwork-list" className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         {artworks.map((artwork) => (

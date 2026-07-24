@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireOwnership } from "@/lib/authz";
+import { usernameParamSchema } from "@/lib/validation";
 
 const bioSchema = z.object({
   bio: z.string().max(2000),
@@ -45,6 +46,10 @@ const bioSchema = z.object({
  *         description: User not found
  */
 export async function PATCH(req: NextRequest, { params }: { params: { username: string } }) {
+  if (!usernameParamSchema.safeParse(params.username).success) {
+    return NextResponse.json({ message: "User not found." }, { status: 404 });
+  }
+
   const user = await prisma.user.findUnique({ where: { username: params.username } });
   if (!user) {
     return NextResponse.json({ message: "User not found." }, { status: 404 });

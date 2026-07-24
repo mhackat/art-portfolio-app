@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { recordFailedLoginAndMaybeLock, resetFailedLoginAttempts } from "@/lib/account-lock";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
@@ -26,8 +27,19 @@ export const authOptions: NextAuthOptions = {
         });
         if (!user) return null;
 
+        // Checked before comparing the password at all, so a locked account never
+        // authenticates even with the right password and leaks no password-correctness
+        // signal while locked.
+        if (user.lockedAt) throw new Error("ACCOUNT_LOCKED");
+
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          const { locked } = await recordFailedLoginAndMaybeLock(user.id);
+          if (locked) throw new Error("ACCOUNT_LOCKED");
+          return null;
+        }
+
+        await resetFailedLoginAttempts(user.id);
 
         return {
           id: user.id,

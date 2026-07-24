@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireOwnership } from "@/lib/authz";
 import { uploadImage } from "@/lib/storage";
 import { validateImageFile, isFileValidationError } from "@/lib/image-upload";
+import { usernameParamSchema } from "@/lib/validation";
 
 const artworkFieldsSchema = z.object({
   title: z.string().min(1).max(200),
@@ -60,8 +61,35 @@ const artworkFieldsSchema = z.object({
  *         description: User not found
  *       503:
  *         description: Image storage is not configured
+ *   delete:
+ *     summary: Delete all of a user's artworks at once, by username
+ *     description: >
+ *       Only the authenticated owner of this username may bulk-delete their own
+ *       gallery. This cannot be undone.
+ *     tags: [Artworks]
+ *     security:
+ *       - apiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: username
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: All artworks deleted
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Authenticated but not the owner of this username
+ *       404:
+ *         description: User not found
  */
 export async function POST(req: NextRequest, { params }: { params: { username: string } }) {
+  if (!usernameParamSchema.safeParse(params.username).success) {
+    return NextResponse.json({ message: "User not found." }, { status: 404 });
+  }
+
   const user = await prisma.user.findUnique({ where: { username: params.username } });
   if (!user) {
     return NextResponse.json({ message: "User not found." }, { status: 404 });
@@ -107,4 +135,24 @@ export async function POST(req: NextRequest, { params }: { params: { username: s
   });
 
   return NextResponse.json(artwork, { status: 201 });
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { username: string } }) {
+  if (!usernameParamSchema.safeParse(params.username).success) {
+    return NextResponse.json({ message: "User not found." }, { status: 404 });
+  }
+
+  const user = await prisma.user.findUnique({ where: { username: params.username } });
+  if (!user) {
+    return NextResponse.json({ message: "User not found." }, { status: 404 });
+  }
+
+  const authz = await requireOwnership(req, user.id);
+  if (!authz.ok) {
+    return NextResponse.json({ message: authz.message }, { status: authz.status });
+  }
+
+  const { count } = await prisma.artwork.deleteMany({ where: { userId: user.id } });
+
+  return NextResponse.json({ count });
 }

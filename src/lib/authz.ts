@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { hashApiKey } from "@/lib/api-keys";
+import { isAccountLockedUserId } from "@/lib/account-lock";
 
 export type AuthzResult =
   | { ok: true; userId: string }
@@ -12,6 +13,9 @@ async function resolveUserId(req: NextRequest): Promise<string | undefined> {
   const authHeader = req.headers.get("authorization");
 
   if (authHeader?.startsWith("Bearer ")) {
+    // No separate lock check needed on this path: lockAccount() deletes every API key
+    // the user has, so a revoked key simply stops resolving here the moment they're
+    // locked — this lookup already fails closed.
     const rawKey = authHeader.slice("Bearer ".length).trim();
     if (!rawKey) return undefined;
 
@@ -28,7 +32,16 @@ async function resolveUserId(req: NextRequest): Promise<string | undefined> {
   }
 
   const session = await getServerSession(authOptions);
-  return (session?.user as any)?.id as string | undefined;
+  const userId = (session?.user as any)?.id as string | undefined;
+  if (!userId) return undefined;
+
+  // Session cookies are stateless JWTs, so unlike API keys they can't be revoked at
+  // lock time — this live check (never trusts a cached claim, same as isAdminUserId
+  // below) is what makes an existing browser session stop working the moment the
+  // account is locked, instead of only blocking future logins.
+  if (await isAccountLockedUserId(userId)) return undefined;
+
+  return userId;
 }
 
 /**

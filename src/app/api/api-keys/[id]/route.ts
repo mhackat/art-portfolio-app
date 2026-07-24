@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/authz";
+import { idParamSchema } from "@/lib/validation";
 
 /**
  * @swagger
@@ -31,6 +32,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const authz = await requireAuth(req);
   if (!authz.ok) {
     return NextResponse.json({ message: authz.message }, { status: authz.status });
+  }
+
+  if (!idParamSchema.safeParse(params.id).success) {
+    return NextResponse.json({ message: "API key not found." }, { status: 404 });
   }
 
   const apiKey = await prisma.apiKey.findUnique({ where: { id: params.id } });
