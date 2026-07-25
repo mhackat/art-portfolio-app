@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { AdminUserRow } from "@/lib/admin";
+import type { AdminUserRow, SortColumn, SortDirection } from "@/lib/admin";
 import DeleteUserButton from "@/components/admin/DeleteUserButton";
 import LockUserButton from "@/components/admin/LockUserButton";
 import AdminPasswordActions from "@/components/admin/AdminPasswordActions";
@@ -18,6 +18,16 @@ const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "portfolio", label: "Portfolio" },
   { key: "actions", label: "Actions" },
 ];
+
+// Only these columns map to something the database can actually sort by —
+// Portfolio (a link) and Actions (buttons) aren't sortable data.
+const SORT_KEYS: Partial<Record<ColumnKey, SortColumn>> = {
+  displayName: "displayName",
+  username: "username",
+  email: "email",
+  artworks: "artworkCount",
+  joined: "createdAt",
+};
 
 const DEFAULT_WIDTHS: Record<ColumnKey, number> = {
   displayName: 160,
@@ -39,12 +49,29 @@ function formatDate(value: Date) {
 export default function ResizableUserTable({
   users,
   currentUserId,
+  search,
+  sortBy,
+  sortDir,
 }: {
   users: AdminUserRow[];
   currentUserId: string;
+  search?: string;
+  sortBy: SortColumn;
+  sortDir: SortDirection;
 }) {
   const [widths, setWidths] = useState<Record<ColumnKey, number>>(DEFAULT_WIDTHS);
   const dragRef = useRef<{ column: ColumnKey; startX: number; startWidth: number } | null>(null);
+
+  function sortHref(column: ColumnKey) {
+    const sortKey = SORT_KEYS[column];
+    if (!sortKey) return undefined;
+    const nextDir: SortDirection = sortBy === sortKey && sortDir === "asc" ? "desc" : "asc";
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    params.set("sortBy", sortKey);
+    params.set("sortDir", nextDir);
+    return `/admin?${params.toString()}`;
+  }
 
   // Loaded client-side only (after hydration) so the initial server-rendered
   // markup always matches the defaults, and each admin's chosen widths stick
@@ -132,22 +159,45 @@ export default function ResizableUserTable({
           </colgroup>
           <thead>
             <tr className="border-b border-gray-200 text-left text-gray-500">
-              {COLUMNS.map((col) => (
-                <th key={col.key} className="relative select-none truncate py-2 pr-4">
-                  {col.label}
-                  <span
-                    role="separator"
-                    aria-orientation="vertical"
-                    aria-label={`Resize ${col.label} column`}
-                    data-testid={`admin-user-table-resize-${col.key}`}
-                    onMouseDown={(e) => startResize(col.key, e)}
-                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-gray-300 active:bg-gray-400"
-                  />
-                </th>
-              ))}
+              {COLUMNS.map((col) => {
+                const sortKey = SORT_KEYS[col.key];
+                const isActive = sortKey === sortBy;
+                const href = sortHref(col.key);
+                return (
+                  <th key={col.key} className="relative select-none truncate py-2 pr-4">
+                    {href ? (
+                      <Link
+                        href={href}
+                        data-testid={`admin-user-table-sort-${col.key}`}
+                        className="hover:text-gray-700 hover:underline"
+                      >
+                        {col.label}
+                        {isActive ? <span className="ml-1">{sortDir === "asc" ? "▲" : "▼"}</span> : null}
+                      </Link>
+                    ) : (
+                      col.label
+                    )}
+                    <span
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={`Resize ${col.label} column`}
+                      data-testid={`admin-user-table-resize-${col.key}`}
+                      onMouseDown={(e) => startResize(col.key, e)}
+                      className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-gray-300 active:bg-gray-400"
+                    />
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
+            {users.length === 0 ? (
+              <tr>
+                <td colSpan={COLUMNS.length} className="py-6 text-center text-gray-500" data-testid="admin-user-table-empty">
+                  No users match &ldquo;{search}&rdquo;.
+                </td>
+              </tr>
+            ) : null}
             {users.map((user) => (
               <tr key={user.id} data-testid={`admin-user-row-${user.id}`} className="border-b border-gray-100">
                 <td className="truncate py-2 pr-4">{user.displayName}</td>

@@ -75,7 +75,7 @@ export default function AdminPasswordActions({ userId }: { userId: string }) {
         onClick={() => setExpanded(true)}
         className="whitespace-nowrap text-base text-gray-700 hover:underline"
       >
-        Password...
+        Change Password
       </button>
     );
   }

@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth-options";
 import { isAdminUserId } from "@/lib/authz";
-import { listUsersPaginated, listLockedUsersPaginated } from "@/lib/admin";
+import { listUsersPaginated, listLockedUsersPaginated, isSortColumn } from "@/lib/admin";
 import UnlockUserButton from "@/components/admin/UnlockUserButton";
 import RevokeAllKeysButton from "@/components/admin/RevokeAllKeysButton";
 import ResizableUserTable from "@/components/admin/ResizableUserTable";
@@ -20,7 +20,7 @@ function formatDate(value: Date) {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: { page?: string; q?: string; sortBy?: string; sortDir?: string };
 }) {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id as string | undefined;
@@ -40,8 +40,29 @@ export default async function AdminPage({
   }
 
   const page = Number(searchParams.page) || 1;
-  const { users, totalCount, totalPages, page: currentPage } = await listUsersPaginated(page, PAGE_SIZE);
+  const search = searchParams.q?.trim() || undefined;
+  const sortByParam = isSortColumn(searchParams.sortBy) ? searchParams.sortBy : undefined;
+  const sortDirParam = searchParams.sortDir === "asc" ? "asc" : undefined;
+
+  const {
+    users,
+    totalCount,
+    totalPages,
+    page: currentPage,
+    sortBy,
+    sortDir,
+  } = await listUsersPaginated(page, PAGE_SIZE, { search, sortBy: sortByParam, sortDir: sortDirParam });
   const { users: lockedUsers } = await listLockedUsersPaginated(1, LOCKED_PAGE_SIZE);
+
+  // Preserves search/sort state across pagination and column-sort links.
+  function buildQuery(overrides: Record<string, string | undefined>) {
+    const params = new URLSearchParams();
+    const merged = { page: String(currentPage), q: search, sortBy, sortDir, ...overrides };
+    for (const [key, value] of Object.entries(merged)) {
+      if (value) params.set(key, value);
+    }
+    return `/admin?${params.toString()}`;
+  }
 
   return (
     <main className="container mx-auto max-w-7xl px-6 py-16" data-testid="admin-page">
@@ -79,15 +100,42 @@ export default async function AdminPage({
         )}
       </section>
 
-      <h2 className="mt-8 text-lg font-medium">All users</h2>
+      <div className="mt-8 flex items-center justify-between gap-4">
+        <h2 className="text-lg font-medium">All users</h2>
+        <form action="/admin" method="GET" className="flex items-center gap-2" data-testid="admin-search-form">
+          {sortBy !== "createdAt" ? <input type="hidden" name="sortBy" value={sortBy} /> : null}
+          {sortDir !== "desc" ? <input type="hidden" name="sortDir" value={sortDir} /> : null}
+          <input
+            type="text"
+            name="q"
+            defaultValue={search ?? ""}
+            placeholder="Search name, username, or email"
+            data-testid="admin-search-input"
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm"
+          />
+          <button
+            type="submit"
+            data-testid="admin-search-submit"
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+          >
+            Search
+          </button>
+          {search ? (
+            <Link href={buildQuery({ q: undefined, page: "1" })} data-testid="admin-search-clear" className="text-sm underline">
+              Clear
+            </Link>
+          ) : null}
+        </form>
+      </div>
+
       <div className="mt-3">
-        <ResizableUserTable users={users} currentUserId={userId} />
+        <ResizableUserTable users={users} currentUserId={userId} search={search} sortBy={sortBy} sortDir={sortDir} />
       </div>
 
       <div className="mt-6 flex items-center justify-between text-sm">
         {currentPage > 1 ? (
           <Link
-            href={`/admin?page=${currentPage - 1}`}
+            href={buildQuery({ page: String(currentPage - 1) })}
             data-testid="admin-prev-page-link"
             className="underline"
           >
@@ -98,7 +146,7 @@ export default async function AdminPage({
         )}
         {currentPage < totalPages ? (
           <Link
-            href={`/admin?page=${currentPage + 1}`}
+            href={buildQuery({ page: String(currentPage + 1) })}
             data-testid="admin-next-page-link"
             className="underline"
           >
