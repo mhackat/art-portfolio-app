@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireOwnership } from "@/lib/authz";
-import { uploadImage } from "@/lib/storage";
+import { uploadImage, deleteImagesBestEffort } from "@/lib/storage";
 import { validateImageFile, isFileValidationError } from "@/lib/image-upload";
 import { usernameParamSchema } from "@/lib/validation";
 
@@ -152,7 +152,15 @@ export async function DELETE(req: NextRequest, { params }: { params: { username:
     return NextResponse.json({ message: authz.message }, { status: authz.status });
   }
 
+  // Collected before the delete — once the rows are gone there's no record of
+  // which objects backed them.
+  const artworks = await prisma.artwork.findMany({
+    where: { userId: user.id },
+    select: { imageUrl: true },
+  });
+
   const { count } = await prisma.artwork.deleteMany({ where: { userId: user.id } });
+  await deleteImagesBestEffort(artworks.map((artwork) => artwork.imageUrl));
 
   return NextResponse.json({ count });
 }

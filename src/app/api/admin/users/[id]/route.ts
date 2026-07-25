@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/authz";
 import { idParamSchema } from "@/lib/validation";
+import { deleteImagesBestEffort } from "@/lib/storage";
 
 /**
  * @swagger
@@ -55,7 +56,15 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ message: "User not found." }, { status: 404 });
   }
 
+  // Deleting the user cascades their artwork rows away in the database, which
+  // would otherwise strand every one of their uploaded images in the bucket.
+  const artworks = await prisma.artwork.findMany({
+    where: { userId: params.id },
+    select: { imageUrl: true },
+  });
+
   await prisma.user.delete({ where: { id: params.id } });
+  await deleteImagesBestEffort(artworks.map((artwork) => artwork.imageUrl));
 
   return new NextResponse(null, { status: 204 });
 }
