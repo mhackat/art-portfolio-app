@@ -10,7 +10,7 @@ export async function GET() {
 
   try {
     const rows = (await prisma.$queryRawUnsafe(
-      "SELECT current_database() as db, (SELECT count(*)::int FROM \"User\") as user_count, (SELECT count(*)::int FROM information_schema.columns WHERE table_name='User' AND column_name='failedLoginAttempts') as has_lockout_col"
+      "SELECT current_database() as db, (SELECT count(*)::int FROM \"public\".\"User\") as user_count, (SELECT count(*)::int FROM information_schema.columns WHERE table_name='User' AND column_name='failedLoginAttempts') as has_lockout_col"
     )) as any[];
 
     return NextResponse.json({
