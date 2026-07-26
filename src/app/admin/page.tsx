@@ -6,6 +6,7 @@ import { isAdminUserId } from "@/lib/authz";
 import { listUsersPaginated, listLockedUsersPaginated, isSortColumn } from "@/lib/admin";
 import UnlockUserButton from "@/components/admin/UnlockUserButton";
 import RevokeAllKeysButton from "@/components/admin/RevokeAllKeysButton";
+import CleanupImagesButton from "@/components/admin/CleanupImagesButton";
 import ResizableUserTable from "@/components/admin/ResizableUserTable";
 
 const PAGE_SIZE = 50;
@@ -73,7 +74,10 @@ export default async function AdminPage({
             {totalCount} total user{totalCount === 1 ? "" : "s"} · page {currentPage} of {totalPages}
           </p>
         </div>
-        <RevokeAllKeysButton />
+        <div className="flex flex-col items-end gap-3">
+          <RevokeAllKeysButton />
+          <CleanupImagesButton />
+        </div>
       </div>
 
       <section className="mt-8" data-testid="admin-locked-users-section">
