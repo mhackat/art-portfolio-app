@@ -25,7 +25,11 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError("Invalid email/username or password.");
+        setError(
+          result.error === "ACCOUNT_LOCKED"
+            ? "This account has been locked. Contact an admin to unlock it."
+            : "Invalid email/username or password."
+        );
         return;
       }
 

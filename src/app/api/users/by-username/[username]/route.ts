@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { usernameParamSchema } from "@/lib/validation";
 
 /**
  * @swagger
@@ -20,6 +21,10 @@ import { prisma } from "@/lib/prisma";
  *         description: User not found
  */
 export async function GET(_req: NextRequest, { params }: { params: { username: string } }) {
+  if (!usernameParamSchema.safeParse(params.username).success) {
+    return NextResponse.json({ message: "User not found." }, { status: 404 });
+  }
+
   const user = await prisma.user.findUnique({
     where: { username: params.username },
     select: {

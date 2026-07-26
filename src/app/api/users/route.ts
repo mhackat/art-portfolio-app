@@ -31,7 +31,8 @@ const MAX_LIMIT = 100;
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q")?.trim() || undefined;
+  const rawQ = searchParams.get("q")?.trim() || undefined;
+  const q = rawQ && rawQ.length <= 200 ? rawQ : undefined;
 
   const limitParam = Number(searchParams.get("limit"));
   const limit =

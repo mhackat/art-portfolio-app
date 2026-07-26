@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const SIGNUP_LIMIT = 5;
 const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
@@ -48,17 +48,9 @@ const signupSchema = z.object({
  *       409:
  *         description: Email or username already taken
  *       429:
- *         description: Too many signups from this IP — try again later
+ *         description: Too many signup attempts for this email — try again later
  */
 export async function POST(req: NextRequest) {
-  const rateLimit = await checkRateLimit("signup", getClientIp(req), SIGNUP_LIMIT, SIGNUP_WINDOW_MS);
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { message: "Too many signup attempts. Please try again later." },
-      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
-    );
-  }
-
   const body = await req.json().catch(() => null);
   const parsed = signupSchema.safeParse(body);
   if (!parsed.success) {
@@ -66,6 +58,17 @@ export async function POST(req: NextRequest) {
   }
 
   const { email, username, password, displayName } = parsed.data;
+
+  // Keyed by the email being signed up with, not the caller's IP — a shared/unknown
+  // IP (e.g. every request from localhost in dev) would otherwise dump every
+  // signup attempt into one bucket and rate-limit unrelated people out.
+  const rateLimit = await checkRateLimit("signup", email.toLowerCase(), SIGNUP_LIMIT, SIGNUP_WINDOW_MS);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { message: "Too many signup attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+    );
+  }
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email }, { username }] },

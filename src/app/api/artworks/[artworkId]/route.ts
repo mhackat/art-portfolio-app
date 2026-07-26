@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireOwnership } from "@/lib/authz";
-import { uploadImage } from "@/lib/storage";
+import { uploadImage, deleteImagesBestEffort } from "@/lib/storage";
 import { validateImageFile, isFileValidationError } from "@/lib/image-upload";
+import { idParamSchema } from "@/lib/validation";
 
 const updateFieldsSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -83,6 +84,10 @@ async function loadArtworkOr404(artworkId: string) {
  *         description: Artwork not found
  */
 export async function PATCH(req: NextRequest, { params }: { params: { artworkId: string } }) {
+  if (!idParamSchema.safeParse(params.artworkId).success) {
+    return NextResponse.json({ message: "Artwork not found." }, { status: 404 });
+  }
+
   const artwork = await loadArtworkOr404(params.artworkId);
   if (!artwork) {
     return NextResponse.json({ message: "Artwork not found." }, { status: 404 });
@@ -134,10 +139,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { artworkId:
     data: { ...parsed.data, ...(imageUrl ? { imageUrl } : {}) },
   });
 
+  // The replaced image is now unreferenced — drop it so swapping an artwork's
+  // image doesn't quietly leave the old object behind in the bucket forever.
+  if (imageUrl && artwork.imageUrl !== imageUrl) {
+    await deleteImagesBestEffort([artwork.imageUrl]);
+  }
+
   return NextResponse.json(updated);
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { artworkId: string } }) {
+  if (!idParamSchema.safeParse(params.artworkId).success) {
+    return NextResponse.json({ message: "Artwork not found." }, { status: 404 });
+  }
+
   const artwork = await loadArtworkOr404(params.artworkId);
   if (!artwork) {
     return NextResponse.json({ message: "Artwork not found." }, { status: 404 });
@@ -149,6 +164,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { artworkId
   }
 
   await prisma.artwork.delete({ where: { id: params.artworkId } });
+  await deleteImagesBestEffort([artwork.imageUrl]);
 
   return new NextResponse(null, { status: 204 });
 }

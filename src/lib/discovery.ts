@@ -36,7 +36,7 @@ async function withLatestArtwork(userIds: string[]): Promise<Map<string, UserCar
 
 export async function getRandomUsersWithLatestArtwork(limit: number): Promise<UserCard[]> {
   const randomIds = await prisma.$queryRaw<{ id: string }[]>`
-    SELECT id FROM "User" ORDER BY RANDOM() LIMIT ${limit}
+    SELECT id FROM "public"."User" ORDER BY RANDOM() LIMIT ${limit}
   `;
   if (randomIds.length === 0) return [];
 

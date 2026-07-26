@@ -14,8 +14,10 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "generate:openapi": "tsx scripts/generate-openapi.ts",
+    "cleanup:images": "tsx --env-file=.env scripts/cleanup-orphaned-images.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio"
   },

@@ -3,10 +3,14 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth-options";
 import { isAdminUserId } from "@/lib/authz";
-import { listUsersPaginated } from "@/lib/admin";
-import DeleteUserButton from "@/components/admin/DeleteUserButton";
+import { listUsersPaginated, listLockedUsersPaginated, isSortColumn } from "@/lib/admin";
+import UnlockUserButton from "@/components/admin/UnlockUserButton";
+import RevokeAllKeysButton from "@/components/admin/RevokeAllKeysButton";
+import CleanupImagesButton from "@/components/admin/CleanupImagesButton";
+import ResizableUserTable from "@/components/admin/ResizableUserTable";
 
 const PAGE_SIZE = 50;
+const LOCKED_PAGE_SIZE = 50;
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +21,7 @@ function formatDate(value: Date) {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: { page?: string };
+  searchParams: { page?: string; q?: string; sortBy?: string; sortDir?: string };
 }) {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id as string | undefined;
@@ -37,58 +41,105 @@ export default async function AdminPage({
   }
 
   const page = Number(searchParams.page) || 1;
-  const { users, totalCount, totalPages, page: currentPage } = await listUsersPaginated(page, PAGE_SIZE);
+  const search = searchParams.q?.trim() || undefined;
+  const sortByParam = isSortColumn(searchParams.sortBy) ? searchParams.sortBy : undefined;
+  const sortDirParam = searchParams.sortDir === "asc" ? "asc" : undefined;
+
+  const {
+    users,
+    totalCount,
+    totalPages,
+    page: currentPage,
+    sortBy,
+    sortDir,
+  } = await listUsersPaginated(page, PAGE_SIZE, { search, sortBy: sortByParam, sortDir: sortDirParam });
+  const { users: lockedUsers } = await listLockedUsersPaginated(1, LOCKED_PAGE_SIZE);
+
+  // Preserves search/sort state across pagination and column-sort links.
+  function buildQuery(overrides: Record<string, string | undefined>) {
+    const params = new URLSearchParams();
+    const merged = { page: String(currentPage), q: search, sortBy, sortDir, ...overrides };
+    for (const [key, value] of Object.entries(merged)) {
+      if (value) params.set(key, value);
+    }
+    return `/admin?${params.toString()}`;
+  }
 
   return (
-    <main className="container mx-auto max-w-5xl px-6 py-16" data-testid="admin-page">
-      <h1 className="text-2xl font-semibold">Admin — Users</h1>
-      <p className="mt-1 text-sm text-gray-600">
-        {totalCount} total user{totalCount === 1 ? "" : "s"} · page {currentPage} of {totalPages}
-      </p>
+    <main className="container mx-auto max-w-7xl px-6 py-16" data-testid="admin-page">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Admin — Users</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            {totalCount} total user{totalCount === 1 ? "" : "s"} · page {currentPage} of {totalPages}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-3">
+          <RevokeAllKeysButton />
+          <CleanupImagesButton />
+        </div>
+      </div>
 
-      <div className="mt-6 overflow-x-auto">
-        <table className="w-full border-collapse text-sm" data-testid="admin-user-table">
-          <thead>
-            <tr className="border-b border-gray-200 text-left text-gray-500">
-              <th className="py-2 pr-4">Display name</th>
-              <th className="py-2 pr-4">Username</th>
-              <th className="py-2 pr-4">Email</th>
-              <th className="py-2 pr-4">Artworks</th>
-              <th className="py-2 pr-4">Joined</th>
-              <th className="py-2 pr-4">Portfolio</th>
-              <th className="py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} data-testid={`admin-user-row-${user.id}`} className="border-b border-gray-100">
-                <td className="py-2 pr-4">{user.displayName}</td>
-                <td className="py-2 pr-4">@{user.username}</td>
-                <td className="py-2 pr-4">{user.email}</td>
-                <td className="py-2 pr-4">{user.artworkCount}</td>
-                <td className="py-2 pr-4">{formatDate(user.createdAt)}</td>
-                <td className="py-2 pr-4">
-                  <Link
-                    href={`/${user.username}`}
-                    data-testid={`admin-portfolio-link-${user.id}`}
-                    className="underline"
-                  >
-                    View
-                  </Link>
-                </td>
-                <td className="py-2">
-                  <DeleteUserButton userId={user.id} displayName={user.displayName} />
-                </td>
-              </tr>
+      <section className="mt-8" data-testid="admin-locked-users-section">
+        <h2 className="text-lg font-medium">Locked accounts</h2>
+        {lockedUsers.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-600">No locked accounts.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {lockedUsers.map((user) => (
+              <li
+                key={user.id}
+                data-testid={`admin-locked-user-row-${user.id}`}
+                className="flex items-center justify-between rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm"
+              >
+                <span>
+                  <strong>{user.displayName}</strong> (@{user.username}, {user.email}) — locked{" "}
+                  {user.lockReason === "admin" ? "by an admin" : "after too many failed login attempts"} on{" "}
+                  {formatDate(user.lockedAt)}
+                </span>
+                <UnlockUserButton userId={user.id} displayName={user.displayName} />
+              </li>
             ))}
-          </tbody>
-        </table>
+          </ul>
+        )}
+      </section>
+
+      <div className="mt-8 flex items-center justify-between gap-4">
+        <h2 className="text-lg font-medium">All users</h2>
+        <form action="/admin" method="GET" className="flex items-center gap-2" data-testid="admin-search-form">
+          {sortBy !== "createdAt" ? <input type="hidden" name="sortBy" value={sortBy} /> : null}
+          {sortDir !== "desc" ? <input type="hidden" name="sortDir" value={sortDir} /> : null}
+          <input
+            type="text"
+            name="q"
+            defaultValue={search ?? ""}
+            placeholder="Search name, username, or email"
+            data-testid="admin-search-input"
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm"
+          />
+          <button
+            type="submit"
+            data-testid="admin-search-submit"
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+          >
+            Search
+          </button>
+          {search ? (
+            <Link href={buildQuery({ q: undefined, page: "1" })} data-testid="admin-search-clear" className="text-sm underline">
+              Clear
+            </Link>
+          ) : null}
+        </form>
+      </div>
+
+      <div className="mt-3">
+        <ResizableUserTable users={users} currentUserId={userId} search={search} sortBy={sortBy} sortDir={sortDir} />
       </div>
 
       <div className="mt-6 flex items-center justify-between text-sm">
         {currentPage > 1 ? (
           <Link
-            href={`/admin?page=${currentPage - 1}`}
+            href={buildQuery({ page: String(currentPage - 1) })}
             data-testid="admin-prev-page-link"
             className="underline"
           >
@@ -99,7 +150,7 @@ export default async function AdminPage({
         )}
         {currentPage < totalPages ? (
           <Link
-            href={`/admin?page=${currentPage + 1}`}
+            href={buildQuery({ page: String(currentPage + 1) })}
             data-testid="admin-next-page-link"
             className="underline"
           >
