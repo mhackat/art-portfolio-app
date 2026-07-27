@@ -218,6 +218,15 @@ export default function ResizableUserTable({
                 </td>
                 <td className="overflow-hidden py-3">
                   <div className="flex flex-col items-start gap-2">
+                    {/* Managing a gallery needs to show the work, which doesn't
+                        fit a table row — so it gets its own page. */}
+                    <Link
+                      href={`/admin/users/${user.id}/artworks`}
+                      data-testid={`admin-manage-artworks-link-${user.id}`}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                    >
+                      Artworks ({user.artworkCount})
+                    </Link>
                     <DeleteUserButton userId={user.id} displayName={user.displayName} />
                     {user.id !== currentUserId ? (
                       <LockUserButton userId={user.id} displayName={user.displayName} />
