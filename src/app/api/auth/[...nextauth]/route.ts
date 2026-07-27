@@ -1,12 +1,9 @@
 import NextAuth from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth-options";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, loginLimit, RATE_LIMIT_WINDOW_MS } from "@/lib/rate-limit";
 
 const handler = NextAuth(authOptions);
-
-const LOGIN_LIMIT = 10;
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 /** Pulled from a cloned request so the original body is still intact for the
  * NextAuth handler below — form bodies can only be read once otherwise. */
@@ -30,8 +27,8 @@ async function POST(req: NextRequest, context: { params: { nextauth: string[] } 
       const rateLimit = await checkRateLimit(
         "login-identifier",
         identifier.toLowerCase(),
-        LOGIN_LIMIT,
-        LOGIN_WINDOW_MS
+        loginLimit(),
+        RATE_LIMIT_WINDOW_MS
       );
       if (!rateLimit.allowed) {
         return NextResponse.json(

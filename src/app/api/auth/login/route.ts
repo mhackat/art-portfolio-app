@@ -3,16 +3,13 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { generateApiKey } from "@/lib/api-keys";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, loginLimit, RATE_LIMIT_WINDOW_MS } from "@/lib/rate-limit";
 import { recordFailedLoginAndMaybeLock, resetFailedLoginAttempts } from "@/lib/account-lock";
 
 const loginSchema = z.object({
   identifier: z.string().min(1),
   password: z.string().min(1),
 });
-
-const LOGIN_LIMIT = 10;
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 /**
  * @swagger
@@ -64,8 +61,8 @@ export async function POST(req: NextRequest) {
   const identifierRateLimit = await checkRateLimit(
     "login-identifier",
     identifier.toLowerCase(),
-    LOGIN_LIMIT,
-    LOGIN_WINDOW_MS
+    loginLimit(),
+    RATE_LIMIT_WINDOW_MS
   );
   if (!identifierRateLimit.allowed) {
     return NextResponse.json(
