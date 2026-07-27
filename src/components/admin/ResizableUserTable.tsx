@@ -67,6 +67,8 @@ export default function ResizableUserTable({
     if (!sortKey) return undefined;
     const nextDir: SortDirection = sortBy === sortKey && sortDir === "asc" ? "desc" : "asc";
     const params = new URLSearchParams();
+    // Explicit rather than relying on Users being the default tab.
+    params.set("tab", "users");
     if (search) params.set("q", search);
     params.set("sortBy", sortKey);
     params.set("sortDir", nextDir);

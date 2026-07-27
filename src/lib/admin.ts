@@ -122,42 +122,72 @@ export type AccessCodeRow = {
   note: string;
   createdAt: Date;
   usedAt: Date | null;
-  usedBy: { username: string; email: string } | null;
+  usedBy: { username: string; displayName: string } | null;
+};
+
+export type PaginatedAccessCodes = {
+  codes: AccessCodeRow[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  /** Drives the "revoke all unused" control, which is pointless at zero. */
+  unusedCount: number;
 };
 
 /**
- * Recent signup access codes, unused first. Only the prefix is available — the full code
- * is hashed at rest and shown once, at generation time.
+ * Signup access codes, unused first so the ones that still matter are on page one.
+ * Only the prefix is available — the full code is hashed at rest and shown once,
+ * at generation time.
  */
-export async function listAccessCodes(limit = 50): Promise<AccessCodeRow[]> {
+export async function listAccessCodesPaginated(page: number, pageSize: number): Promise<PaginatedAccessCodes> {
+  const safePage = Math.max(1, Math.floor(page) || 1);
+
+  const [totalCount, unusedCount] = await Promise.all([
+    prisma.accessCode.count(),
+    prisma.accessCode.count({ where: { usedAt: null } }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentPage = Math.min(safePage, totalPages);
+
   const codes = await prisma.accessCode.findMany({
     orderBy: [{ usedAt: "asc" }, { createdAt: "desc" }],
-    take: limit,
+    skip: (currentPage - 1) * pageSize,
+    take: pageSize,
     select: { id: true, codePrefix: true, note: true, createdAt: true, usedAt: true, usedByUserId: true },
   });
 
   // AccessCode has no FK to User (a consumed code must survive the user being deleted),
   // so the redeemer is resolved with one extra lookup rather than a relation include.
+  // That also means usedBy can be null on a used code — the account is simply gone.
   const userIds = codes.map((c) => c.usedByUserId).filter((id): id is string => !!id);
   const users = userIds.length
     ? await prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, username: true, email: true },
+        select: { id: true, username: true, displayName: true },
       })
     : [];
   const usersById = new Map(users.map((u) => [u.id, u]));
 
-  return codes.map((c) => {
-    const user = c.usedByUserId ? usersById.get(c.usedByUserId) : undefined;
-    return {
-      id: c.id,
-      codePrefix: c.codePrefix,
-      note: c.note,
-      createdAt: c.createdAt,
-      usedAt: c.usedAt,
-      usedBy: user ? { username: user.username, email: user.email } : null,
-    };
-  });
+  return {
+    codes: codes.map((c) => {
+      const user = c.usedByUserId ? usersById.get(c.usedByUserId) : undefined;
+      return {
+        id: c.id,
+        codePrefix: c.codePrefix,
+        note: c.note,
+        createdAt: c.createdAt,
+        usedAt: c.usedAt,
+        usedBy: user ? { username: user.username, displayName: user.displayName } : null,
+      };
+    }),
+    page: currentPage,
+    pageSize,
+    totalCount,
+    totalPages,
+    unusedCount,
+  };
 }
 
 /** Same pagination shape as listUsersPaginated, scoped to only locked accounts —
