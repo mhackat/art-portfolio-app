@@ -116,6 +116,50 @@ export async function listUsersPaginated(
   };
 }
 
+export type AccessCodeRow = {
+  id: string;
+  codePrefix: string;
+  note: string;
+  createdAt: Date;
+  usedAt: Date | null;
+  usedBy: { username: string; email: string } | null;
+};
+
+/**
+ * Recent signup access codes, unused first. Only the prefix is available — the full code
+ * is hashed at rest and shown once, at generation time.
+ */
+export async function listAccessCodes(limit = 50): Promise<AccessCodeRow[]> {
+  const codes = await prisma.accessCode.findMany({
+    orderBy: [{ usedAt: "asc" }, { createdAt: "desc" }],
+    take: limit,
+    select: { id: true, codePrefix: true, note: true, createdAt: true, usedAt: true, usedByUserId: true },
+  });
+
+  // AccessCode has no FK to User (a consumed code must survive the user being deleted),
+  // so the redeemer is resolved with one extra lookup rather than a relation include.
+  const userIds = codes.map((c) => c.usedByUserId).filter((id): id is string => !!id);
+  const users = userIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, username: true, email: true },
+      })
+    : [];
+  const usersById = new Map(users.map((u) => [u.id, u]));
+
+  return codes.map((c) => {
+    const user = c.usedByUserId ? usersById.get(c.usedByUserId) : undefined;
+    return {
+      id: c.id,
+      codePrefix: c.codePrefix,
+      note: c.note,
+      createdAt: c.createdAt,
+      usedAt: c.usedAt,
+      usedBy: user ? { username: user.username, email: user.email } : null,
+    };
+  });
+}
+
 /** Same pagination shape as listUsersPaginated, scoped to only locked accounts —
  * expected to be a small, exceptional set, but kept paginated for consistency. */
 export async function listLockedUsersPaginated(page: number, pageSize: number): Promise<PaginatedLockedUsers> {

@@ -1,12 +1,16 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import ArtworkGallery from "@/components/profile/ArtworkGallery";
+import ProfileShowcase from "@/components/profile/ProfileShowcase";
 
 export const dynamic = "force-dynamic";
 
-export default async function PublicProfilePage({ params }: { params: { username: string } }) {
-  const user = await prisma.user.findUnique({
-    where: { username: params.username },
+/** Cached per request so generateMetadata and the page body share one query
+ * instead of each hitting the database for the same profile. */
+const getProfile = cache(async (username: string) => {
+  return prisma.user.findUnique({
+    where: { username },
     select: {
       username: true,
       displayName: true,
@@ -17,24 +21,31 @@ export default async function PublicProfilePage({ params }: { params: { username
       },
     },
   });
+});
+
+export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
+  const user = await getProfile(params.username);
+  if (!user) return { title: "Not found — Art Portfolio" };
+
+  return {
+    title: `${user.displayName} — Art Portfolio`,
+    description: user.bio || `Work by ${user.displayName} (@${user.username}).`,
+  };
+}
+
+export default async function PublicProfilePage({ params }: { params: { username: string } }) {
+  const user = await getProfile(params.username);
 
   if (!user) {
     notFound();
   }
 
   return (
-    <main className="container mx-auto max-w-3xl px-6 py-16" data-testid="profile-page">
-      <h1 data-testid="profile-displayname" className="text-2xl font-semibold">
-        {user.displayName}
-      </h1>
-      <p className="text-sm text-gray-500">@{user.username}</p>
-      {user.bio ? (
-        <p data-testid="profile-bio" className="mt-3 text-gray-700">
-          {user.bio}
-        </p>
-      ) : null}
-
-      <ArtworkGallery artworks={user.artworks} />
-    </main>
+    <ProfileShowcase
+      displayName={user.displayName}
+      username={user.username}
+      bio={user.bio}
+      artworks={user.artworks}
+    />
   );
 }

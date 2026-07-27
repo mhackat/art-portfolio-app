@@ -8,13 +8,18 @@ export default function Nav() {
 
   return (
     <nav className="border-b border-gray-200">
-      <div className="container mx-auto flex items-center justify-between px-6 py-4">
+      <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-4">
         <Link href="/" className="text-lg font-semibold">
           Art Portfolio
         </Link>
-        <div className="flex items-center gap-4 text-sm" data-testid="nav-links">
+        {/* Wraps rather than overflowing: signed in as an admin this row carries
+            six items, which is wider than a phone viewport on one line. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" data-testid="nav-links">
           <Link href="/browse" data-testid="nav-browse-link" className="hover:underline">
             Browse
+          </Link>
+          <Link href="/tour" data-testid="nav-tour-link" className="hover:underline">
+            Tour
           </Link>
           {status === "authenticated" && session?.user ? (
             <>

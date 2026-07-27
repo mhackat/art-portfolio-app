@@ -1,3 +1,173 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Page motion primitives. `.reveal` is shared (used by /tour and /browse) and
+   driven by the observer in src/components/motion/Reveal.tsx. Everything still
+   prefixed `tour-` belongs to /tour alone. All motion is disabled under
+   prefers-reduced-motion at the bottom.
+   --------------------------------------------------------------------------- */
+
+/* Scroll-triggered reveal. Elements start shifted and transparent; the shared
+   IntersectionObserver adds .is-visible once they enter the viewport.
+
+   No will-change on purpose: a long page carries dozens of these, and promoting
+   every one to its own compositor layer costs more on a mid-range phone than
+   the transition saves. */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Staggered children — each step delays the reveal by 70ms. Namespaced to avoid
+   colliding with Tailwind's own `delay-*` transition-delay utilities. */
+.reveal-delay-1 { transition-delay: 0.07s; }
+.reveal-delay-2 { transition-delay: 0.14s; }
+.reveal-delay-3 { transition-delay: 0.21s; }
+.reveal-delay-4 { transition-delay: 0.28s; }
+.reveal-delay-5 { transition-delay: 0.35s; }
+
+/* Word-at-a-time heading reveal. The wrapper itself deliberately does NOT carry
+   `.reveal` — it must stay put while its words animate, or the whole line would
+   slide as one and the per-word stagger would be invisible. The shared observer
+   watches this class too and adds .is-visible the same way.
+   Per-word delay is set inline, since it depends on word position. */
+.reveal-words .word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.5em);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-words.is-visible .word {
+  opacity: 1;
+  transform: none;
+}
+
+/* Entrance animation for content already on screen at load, where waiting for a
+   scroll observer would mean the reader sees nothing happen. Delay is inline. */
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.enter {
+  animation: enter-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Infinite ticker. The track holds the content twice, so translating it by
+   exactly -50% lands on a seamless loop point. */
+@keyframes tour-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.tour-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: tour-marquee 38s linear infinite;
+}
+.tour-marquee-track--reverse {
+  animation-direction: reverse;
+  animation-duration: 46s;
+}
+.tour-marquee:hover .tour-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Link/CTA whose label slides up and is replaced by an identical copy. Shared:
+   the duplicate copy must carry aria-hidden so it isn't announced twice. */
+.swap {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.swap span {
+  display: block;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.swap span:last-child {
+  position: absolute;
+  inset: 0;
+  transform: translateY(105%);
+}
+.swap:hover span:first-child {
+  transform: translateY(-105%);
+}
+.swap:hover span:last-child {
+  transform: translateY(0);
+}
+
+/* Rule that draws itself in when its section is reached. */
+.tour-rule {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tour-rule.is-visible {
+  transform: scaleX(1);
+}
+
+/* Horizontal rail: native snap scrolling on touch, drag-to-pan on desktop. */
+.tour-rail {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+}
+.tour-rail::-webkit-scrollbar {
+  display: none;
+}
+.tour-rail > * {
+  scroll-snap-align: start;
+}
+.tour-rail.is-dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
+  user-select: none;
+}
+
+.blink {
+  animation: blink 2.4s steps(1) infinite;
+}
+@keyframes blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0.15; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-words .word {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .enter {
+    animation: none;
+  }
+  .tour-rule {
+    transform: scaleX(1);
+    transition: none;
+  }
+  .tour-marquee-track,
+  .blink {
+    animation: none;
+  }
+  .swap span {
+    transition: none;
+  }
+}
