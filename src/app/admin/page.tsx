@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth-options";
 import { isAdminUserId } from "@/lib/authz";
 import { listUsersPaginated, listLockedUsersPaginated, listAccessCodes, isSortColumn } from "@/lib/admin";
 import GenerateAccessCodeButton from "@/components/admin/GenerateAccessCodeButton";
+import SeedArtistsButton from "@/components/admin/SeedArtistsButton";
 import UnlockUserButton from "@/components/admin/UnlockUserButton";
 import RevokeAllKeysButton from "@/components/admin/RevokeAllKeysButton";
 import CleanupImagesButton from "@/components/admin/CleanupImagesButton";
@@ -120,6 +121,17 @@ export default async function AdminPage({
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="mt-8" data-testid="admin-seed-section">
+        <h2 className="text-lg font-medium">Demo content</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Populates this environment with believable artists. Runs server-side, so it needs no database or
+          storage credentials.
+        </p>
+        <div className="mt-3">
+          <SeedArtistsButton />
+        </div>
       </section>
 
       <section className="mt-8" data-testid="admin-locked-users-section">
