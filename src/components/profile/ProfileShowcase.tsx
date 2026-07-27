@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Reveal, Words, useRevealOnScroll } from "@/components/motion/Reveal";
+import { useRevealOnScroll } from "@/components/motion/Reveal";
+import ArtworkSection from "@/components/artwork/ArtworkSection";
 
 type Artwork = {
   id: string;
@@ -126,110 +127,25 @@ export default function ProfileShowcase({
           </p>
         ) : (
           <div data-testid="profile-artwork-list">
-            {artworks.map((artwork, i) => {
-              // Alternate which edge the caption sits against so the scroll doesn't
-              // settle into a single repeating rhythm.
-              const textRight = i % 2 === 1;
-
-              return (
-                <section
-                  key={artwork.id}
-                  data-testid={`profile-artwork-item-${artwork.id}`}
-                  className="group relative flex min-h-[88vh] items-end overflow-hidden sm:items-center"
-                >
-                  {/* The artwork fills the whole section. object-cover crops rather
-                      than letterboxes, which is the trade for edge-to-edge — the
-                      modal is where the uncropped piece lives. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={artwork.imageUrl}
-                    alt={artwork.title}
-                    // The first piece is the largest thing after the hero — eager so
-                    // it isn't the slow paint.
-                    loading={i === 0 ? "eager" : "lazy"}
-                    decoding="async"
-                    className="absolute inset-0 h-full w-full scale-[1.02] object-cover transition-transform duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.07]"
-                  />
-
-                  {/* Scrim. Vertical on phones, where a side gradient would leave
-                      text over the busiest part of the image; horizontal from the
-                      caption's edge on wider screens. Without this, legibility
-                      depends entirely on what the artist happened to upload. */}
-                  <div
-                    aria-hidden="true"
-                    className={`absolute inset-0 bg-gradient-to-t from-neutral-950/90 via-neutral-950/50 to-neutral-950/20 ${
-                      textRight ? "md:bg-gradient-to-l" : "md:bg-gradient-to-r"
-                    }`}
-                  />
-
-                  {/* Full-bleed click target sits under the caption so a click
-                      anywhere on the artwork opens it. */}
-                  <button
-                    type="button"
-                    onClick={() => setSelected(artwork)}
-                    data-testid={`profile-artwork-open-${artwork.id}`}
-                    aria-label={`Open ${artwork.title} full size`}
-                    className="absolute inset-0 z-10 cursor-zoom-in"
-                  />
-
-                  {/* pointer-events-none so clicks pass through the caption to the
-                      full-bleed button underneath — otherwise the artwork opens
-                      everywhere except on its own title. The CTA re-enables them. */}
-                  <div className="pointer-events-none relative z-20 mx-auto w-full max-w-6xl px-6 py-16 sm:px-8">
-                    <div className={`relative max-w-xl ${textRight ? "md:ml-auto" : ""}`}>
-                      {/* Overlay panel behind the caption. Reveals on scroll ahead of
-                          the text so the surface arrives first and the words land on
-                          it. Negative z-index is safe here: the caption wrapper is
-                          `relative z-20`, so it owns a stacking context and this can
-                          only go behind its own text — never behind the artwork.
-                          Also carries the contrast the text needs, since a scrim
-                          alone can't be trusted against every uploaded image. */}
-                      <Reveal className="absolute -inset-x-5 -inset-y-6 -z-10 sm:-inset-x-7 sm:-inset-y-8">
-                        <div className="h-full w-full rounded-2xl bg-neutral-950/55 shadow-2xl ring-1 ring-white/10 backdrop-blur-[3px]" />
-                      </Reveal>
-
-                      <Reveal delay={1}>
-                        <div className="flex items-center gap-4 text-white/60">
-                          <Eyebrow>W/{String(i + 1).padStart(3, "0")}</Eyebrow>
-                          <span className="h-px w-8 bg-white/40" />
-                          <Eyebrow>{displayName}</Eyebrow>
-                        </div>
-                      </Reveal>
-
-                      {/* Starts after the panel and eyebrow so the cascade reads
-                          surface → label → title → description → action. */}
-                      <Words
-                        as="h2"
-                        text={artwork.title}
-                        startDelay={0.16}
-                        className="mt-5 text-[clamp(1.75rem,4.5vw,3.25rem)] font-medium leading-[1.04] tracking-[-0.035em] text-white"
-                      />
-
-                      {artwork.description ? (
-                        <Reveal delay={4}>
-                          <p className="mt-5 text-lg leading-relaxed text-white/80">{artwork.description}</p>
-                        </Reveal>
-                      ) : null}
-
-                      <Reveal delay={5}>
-                        {/* pointer-events-auto: the caption column sits above the
-                            full-bleed button, so this needs to take its own clicks. */}
-                        <button
-                          type="button"
-                          onClick={() => setSelected(artwork)}
-                          className="swap pointer-events-auto mt-8 rounded-full bg-white px-6 py-3 text-sm text-neutral-900"
-                        >
-                          <span>View full size</span>
-                          <span className="grid place-items-center" aria-hidden="true">
-                            View full size
-                          </span>
-                        </button>
-                      </Reveal>
-                    </div>
-                  </div>
-                </section>
-              );
-            })}
+            {artworks.map((artwork, i) => (
+              <ArtworkSection
+                key={artwork.id}
+                testId={`profile-artwork-item-${artwork.id}`}
+                actionTestId={`profile-artwork-open-${artwork.id}`}
+                imageUrl={artwork.imageUrl}
+                title={artwork.title}
+                description={artwork.description}
+                index={i}
+                meta={displayName}
+                eager={i === 0}
+                ctaLabel="View full size"
+                action={{
+                  kind: "button",
+                  onClick: () => setSelected(artwork),
+                  ariaLabel: `Open ${artwork.title} full size`,
+                }}
+              />
+            ))}
           </div>
         )}
       </main>
