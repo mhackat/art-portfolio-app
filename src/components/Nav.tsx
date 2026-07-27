@@ -1,13 +1,57 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 
 export default function Nav() {
   const { data: session, status } = useSession();
+  const navRef = useRef<HTMLElement>(null);
+
+  /**
+   * Publishes the bar's real height as --nav-h so anything else that sticks can
+   * sit directly beneath it (the profile page's artist bar does).
+   *
+   * Measured rather than hardcoded because this row wraps to two lines when a
+   * signed-in admin's six links don't fit a phone — so its height depends on
+   * auth state and viewport width, not on a breakpoint.
+   */
+  useEffect(() => {
+    const node = navRef.current;
+    if (!node) return;
+
+    const publish = () => {
+      const height = node.offsetHeight;
+      // Ignore a zero/absurd reading taken before styles have settled — the CSS
+      // fallback is closer to the truth than a bad measurement would be.
+      if (height > 0) {
+        document.documentElement.style.setProperty("--nav-h", `${height}px`);
+      }
+    };
+
+    // First read happens after a frame, so it measures a laid-out, styled bar
+    // rather than whatever the markup looks like mid-hydration.
+    const frame = requestAnimationFrame(publish);
+
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    // Belt and braces: ResizeObserver is delivered on the frame lifecycle, so a
+    // backgrounded tab can miss changes it would otherwise report.
+    window.addEventListener("resize", publish);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", publish);
+    };
+    // Re-measures when the link set changes (signing in adds rows).
+  }, [status, session?.user]);
 
   return (
-    <nav className="border-b border-gray-200">
+    <nav
+      ref={navRef}
+      className="sticky top-0 z-50 border-b border-gray-200 bg-white/85 backdrop-blur-md"
+    >
       <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-4">
         <Link href="/" className="text-lg font-semibold">
           Art Portfolio

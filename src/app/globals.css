@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Height of the sticky site nav, republished by Nav.tsx once it has measured
+   itself. The fallback matters for the first paint and for the no-JS case —
+   without it, anything positioned at top-[var(--nav-h)] would sit at the very
+   top and hide behind the bar. */
+:root {
+  --nav-h: 61px;
+}
+
 /* ---------------------------------------------------------------------------
    Page motion primitives. `.reveal` is shared (used by /tour and /browse) and
    driven by the observer in src/components/motion/Reveal.tsx. Everything still

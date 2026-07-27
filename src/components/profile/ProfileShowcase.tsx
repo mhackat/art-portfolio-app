@@ -51,7 +51,9 @@ export default function ProfileShowcase({
     <>
       {/* Sticky identity bar — stays on screen for the whole scroll so it's always
           clear whose portfolio this is, however deep into the work you are. */}
-      <div className="sticky top-0 z-30 border-b border-neutral-200 bg-white/85 backdrop-blur-md">
+      {/* Sticks directly beneath the site nav rather than at the top, so the two
+          stack instead of overlapping. --nav-h is measured and published by Nav. */}
+      <div className="sticky top-[var(--nav-h)] z-30 border-b border-neutral-200 bg-white/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-baseline gap-x-4 gap-y-1 px-6 py-3 sm:px-8">
           <span className="enter text-lg font-medium tracking-[-0.02em]" style={{ animationDelay: "0.05s" }}>
             {displayName}
@@ -152,7 +154,9 @@ export default function ProfileShowcase({
 
       {selected ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          /* Above the sticky nav (z-50) — a dialog covering the page shouldn't
+             leave the site bar floating on top of it. */
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4"
           onClick={() => setSelected(null)}
           data-testid="artwork-modal-backdrop"
         >
