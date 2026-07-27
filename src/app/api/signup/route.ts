@@ -11,15 +11,21 @@ const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
 const ACCESS_CODE_REQUIRED_MESSAGE =
   "A valid one-time access code is required to sign up. Please contact hirehackett@gmail.com for an access code.";
 
+// Messages are written to be shown to a person, not just logged — the sign-up
+// form renders these verbatim, so "String must contain at least 8 character(s)"
+// isn't good enough.
 const signupSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email("Enter a valid email address."),
   username: z
     .string()
-    .min(3)
-    .max(30)
-    .regex(/^[a-zA-Z0-9_-]+$/, "Username may only contain letters, numbers, - and _"),
-  password: z.string().min(8),
-  displayName: z.string().min(1).max(100),
+    .min(3, "Username must be at least 3 characters.")
+    .max(30, "Username must be 30 characters or fewer.")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Username may only contain letters, numbers, hyphens and underscores."),
+  password: z.string().min(8, "Password must be at least 8 characters."),
+  displayName: z
+    .string()
+    .min(1, "Display name is required.")
+    .max(100, "Display name must be 100 characters or fewer."),
   accessCode: z.string().min(1, "An access code is required."),
 });
 
