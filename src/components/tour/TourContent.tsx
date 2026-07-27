@@ -307,7 +307,9 @@ export default function TourContent() {
   return (
     <div className="bg-white text-neutral-900">
       {/* Scroll progress */}
-      <div className="fixed inset-x-0 top-0 z-50 h-0.5 bg-transparent">
+      {/* Above the sticky nav (z-50) so the 2px line reads across the very top of
+          the page rather than being covered by it. */}
+      <div className="fixed inset-x-0 top-0 z-[60] h-0.5 bg-transparent">
         <div
           className="h-full origin-left bg-neutral-900 transition-transform duration-150 ease-out"
           style={{ transform: `scaleX(${progress})` }}

@@ -51,7 +51,10 @@ export default function ArtworkSection({
   return (
     <section
       data-testid={testId}
-      className="group relative flex min-h-[88vh] items-end overflow-hidden sm:items-center"
+      /* items-end at every size: the caption sits down in the corner rather than
+         floating over the middle of the picture. That's how it always read on
+         phones, and it's the better place for it on a desktop too. */
+      className="group relative flex min-h-[88vh] items-end overflow-hidden"
     >
       {/* The artwork fills the whole section. object-cover crops rather than
           letterboxes, which is the trade for edge-to-edge. */}
