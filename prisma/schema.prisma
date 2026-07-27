@@ -56,6 +56,23 @@ model RateLimitHit {
   @@index([key, createdAt])
 }
 
+/// A single-use invite code an admin generates and hands to a prospective user out of
+/// band — signup is closed without one. Only the hash is stored (same treatment as API
+/// keys and reset tokens), so the raw code is visible exactly once, in the response to
+/// the admin that created it.
+model AccessCode {
+  id           String    @id @default(cuid())
+  codeHash     String    @unique
+  codePrefix   String
+  note         String    @default("")
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  usedAt       DateTime?
+  usedByUserId String?
+
+  @@index([usedAt])
+}
+
 model PasswordResetToken {
   id         String    @id @default(cuid())
   userId     String

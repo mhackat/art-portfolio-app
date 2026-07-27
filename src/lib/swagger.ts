@@ -32,7 +32,9 @@ export const getApiDocs = (): Record<string, unknown> => {
           "API for managing user art portfolios and bios. Users may only modify their own resources. " +
           "Authenticate by generating a personal API key from the dashboard (or via POST /api/auth/login) " +
           "and sending it as `Authorization: Bearer <key>`. The web dashboard itself authenticates via " +
-          "its own browser session automatically and isn't affected by this.",
+          "its own browser session automatically and isn't affected by this.\n\n" +
+          "**Registration is invite-only.** `POST /api/signup` requires a one-time `accessCode` issued by an " +
+          "administrator. Please contact hirehackett@gmail.com for an access code.",
       },
       servers: [
         { url: process.env.NEXTAUTH_URL || "http://localhost:3000", description: process.env.APP_ENV || "local" },

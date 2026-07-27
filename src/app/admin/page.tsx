@@ -3,7 +3,8 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth-options";
 import { isAdminUserId } from "@/lib/authz";
-import { listUsersPaginated, listLockedUsersPaginated, isSortColumn } from "@/lib/admin";
+import { listUsersPaginated, listLockedUsersPaginated, listAccessCodes, isSortColumn } from "@/lib/admin";
+import GenerateAccessCodeButton from "@/components/admin/GenerateAccessCodeButton";
 import UnlockUserButton from "@/components/admin/UnlockUserButton";
 import RevokeAllKeysButton from "@/components/admin/RevokeAllKeysButton";
 import CleanupImagesButton from "@/components/admin/CleanupImagesButton";
@@ -11,6 +12,7 @@ import ResizableUserTable from "@/components/admin/ResizableUserTable";
 
 const PAGE_SIZE = 50;
 const LOCKED_PAGE_SIZE = 50;
+const ACCESS_CODE_LIMIT = 50;
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +56,7 @@ export default async function AdminPage({
     sortDir,
   } = await listUsersPaginated(page, PAGE_SIZE, { search, sortBy: sortByParam, sortDir: sortDirParam });
   const { users: lockedUsers } = await listLockedUsersPaginated(1, LOCKED_PAGE_SIZE);
+  const accessCodes = await listAccessCodes(ACCESS_CODE_LIMIT);
 
   // Preserves search/sort state across pagination and column-sort links.
   function buildQuery(overrides: Record<string, string | undefined>) {
@@ -79,6 +82,45 @@ export default async function AdminPage({
           <CleanupImagesButton />
         </div>
       </div>
+
+      <section className="mt-8" data-testid="admin-access-codes-section">
+        <h2 className="text-lg font-medium">Signup access codes</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Signup is invite-only. Generate a one-time code and send it to the person requesting an account — they
+          enter it on the sign-up page. Each code works for exactly one account.
+        </p>
+
+        <div className="mt-3">
+          <GenerateAccessCodeButton />
+        </div>
+
+        {accessCodes.length === 0 ? (
+          <p className="mt-3 text-sm text-gray-600">No access codes generated yet.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {accessCodes.map((code) => (
+              <li
+                key={code.id}
+                data-testid={`admin-access-code-row-${code.id}`}
+                className={`flex items-center justify-between gap-3 rounded border px-3 py-2 text-sm ${
+                  code.usedAt ? "border-gray-200 bg-gray-50 text-gray-600" : "border-green-200 bg-green-50"
+                }`}
+              >
+                <span>
+                  <code>{code.codePrefix}…</code>
+                  {code.note ? <span className="ml-2 text-gray-700">— {code.note}</span> : null}
+                  <span className="ml-2 text-xs text-gray-500">issued {formatDate(code.createdAt)}</span>
+                </span>
+                <span className="shrink-0 text-xs">
+                  {code.usedAt
+                    ? `Used ${formatDate(code.usedAt)}${code.usedBy ? ` by @${code.usedBy.username}` : ""}`
+                    : "Unused"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="mt-8" data-testid="admin-locked-users-section">
         <h2 className="text-lg font-medium">Locked accounts</h2>

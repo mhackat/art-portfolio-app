@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
+  const [accessCode, setAccessCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,7 +24,7 @@ export default function SignupPage() {
       const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, displayName, password }),
+        body: JSON.stringify({ email, username, displayName, password, accessCode: accessCode.trim() }),
       });
 
       if (!res.ok) {
@@ -53,6 +54,17 @@ export default function SignupPage() {
   return (
     <main className="container mx-auto max-w-sm px-6 py-16">
       <h1 className="text-2xl font-semibold">Sign up</h1>
+
+      <p
+        data-testid="signup-access-code-notice"
+        className="mt-3 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900"
+      >
+        Sign up is invite-only. You need a one-time access code to create an account — please contact{" "}
+        <a href="mailto:hirehackett@gmail.com" className="font-medium underline">
+          hirehackett@gmail.com
+        </a>{" "}
+        for an access code.
+      </p>
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit} data-testid="signup-form">
         <div>
@@ -114,6 +126,29 @@ export default function SignupPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
           />
+        </div>
+
+        <div>
+          <label htmlFor="accessCode" className="block text-sm font-medium">
+            Access code
+          </label>
+          <input
+            id="accessCode"
+            data-testid="signup-access-code-input"
+            type="text"
+            required
+            value={accessCode}
+            onChange={(e) => setAccessCode(e.target.value)}
+            placeholder="inv_..."
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+          />
+          <p className="mt-1 text-xs text-gray-600">
+            Don&apos;t have one? Contact{" "}
+            <a href="mailto:hirehackett@gmail.com" className="underline">
+              hirehackett@gmail.com
+            </a>
+            .
+          </p>
         </div>
 
         {error ? (

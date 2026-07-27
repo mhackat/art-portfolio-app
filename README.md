@@ -181,6 +181,27 @@ Backing API, both admin-only (`GET`/`DELETE` require an admin session or API key
 - `DELETE /api/admin/users/{id}` — deletes a user and everything in their portfolio;
   blocks deleting your own account through this endpoint
 
+## Invite-only signup
+
+Registration is closed: `POST /api/signup` requires a one-time `accessCode`, and the
+sign-up page has a matching field. Prospective users are told to contact
+hirehackett@gmail.com for a code (on the sign-up page and in the Swagger description).
+
+Admins generate codes from the "Signup access codes" section of `/admin`, then pass the
+code to the user out of band — the app still has no email-sending capability. Only the
+SHA-256 hash is stored (`src/lib/access-codes.ts`, same treatment as API keys and reset
+tokens), so a raw code is displayed exactly once, at generation time; a lost code just
+means generating a fresh one. The `/admin` list shows each code's prefix, note, and
+whether it's been redeemed.
+
+Redemption and account creation happen in one transaction with a `usedAt: null` guard on
+the update, so two people racing the same code can't both get an account.
+
+Backing API (admin-only):
+- `POST /api/admin/access-codes` — generate a code; optional `{ "note": "..." }` label.
+  The raw code is only in this response
+- `GET /api/admin/access-codes` — list issued codes (prefixes only), unused first
+
 ## Environments
 
 This app reads all config from environment variables (`DATABASE_URL`, `NEXTAUTH_SECRET`,
