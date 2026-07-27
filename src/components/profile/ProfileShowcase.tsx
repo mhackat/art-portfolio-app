@@ -156,13 +156,21 @@ export default function ProfileShowcase({
           onClick={() => setSelected(null)}
           data-testid="artwork-modal-backdrop"
         >
-          <div className="relative max-h-full max-w-full" onClick={(e) => e.stopPropagation()} data-testid="artwork-modal">
+          {/* Column, so the caption sits below the artwork rather than on top of
+              it. The two heights are budgeted separately — image up to 70vh,
+              caption up to 22vh — so a long description scrolls itself instead of
+              pushing the picture off screen. */}
+          <div
+            className="relative flex max-h-[92vh] max-w-full flex-col overflow-hidden rounded-lg bg-neutral-900 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="artwork-modal"
+          >
             <button
               type="button"
               onClick={() => setSelected(null)}
               data-testid="artwork-modal-close"
               aria-label="Close"
-              className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+              className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
             >
               ✕
             </button>
@@ -170,9 +178,9 @@ export default function ProfileShowcase({
             <img
               src={selected.imageUrl}
               alt={selected.title}
-              className="max-h-[85vh] max-w-full rounded object-contain"
+              className="max-h-[70vh] max-w-[92vw] object-contain"
             />
-            <div className="absolute bottom-0 left-0 right-0 rounded-b bg-black/70 p-4 text-white">
+            <div className="max-h-[22vh] shrink-0 overflow-y-auto border-t border-white/10 p-4 text-white">
               <h3 data-testid="artwork-modal-title" className="text-lg font-semibold">
                 {selected.title}
               </h3>
