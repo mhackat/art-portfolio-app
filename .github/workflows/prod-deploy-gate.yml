@@ -5,9 +5,15 @@ name: Prod deploy gate
 # merge itself. This runs on every PR targeting `main` and is wired up as a
 # required status check in branch protection — see README.md "Push workflow".
 #
-# Runs everything except the admin tests (see art-portfolio-api-tests'
-# tests/admin/admin.spec.ts, tagged @admin) against the `test` environment
+# Runs the whole suite, admin tests included, against the `test` environment
 # (art-portfolio-app-plumtest.vercel.app), never Production.
+#
+# The @admin-tagged specs need ADMIN_EMAIL/ADMIN_PASSWORD below; without them
+# they skip rather than fail, so a missing secret quietly narrows coverage
+# instead of breaking the gate.
+#
+# `test` must be kept up to date with `main`, or the suite will be exercising
+# older code than the PR it is gating.
 
 on:
   pull_request:
@@ -46,6 +52,12 @@ jobs:
           API_AUTOMATION_EMAIL: ${{ secrets.API_AUTOMATION_EMAIL }}
           API_AUTOMATION_PASSWORD: ${{ secrets.API_AUTOMATION_PASSWORD }}
           API_AUTOMATION_DISPLAY_NAME: ${{ secrets.API_AUTOMATION_DISPLAY_NAME }}
+          # Admin-tagged specs (tests/admin/*, tests/auth/signup.spec.ts) skip
+          # themselves when these are absent, so the gate still runs — it just
+          # covers less. Set both repository secrets to an account that is in the
+          # test environment's own ADMIN_EMAILS.
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: npm run test:ci
 
       - name: Upload HTML report
