@@ -8,6 +8,23 @@ import { hashAccessCode } from "@/lib/access-codes";
 const ACCESS_CODE_REQUIRED_MESSAGE =
   "A valid one-time access code is required to sign up. Please contact hirehackett@gmail.com for an access code.";
 
+/**
+ * Whether a signup must carry an access code.
+ *
+ * Production is hard-wired to yes and ignores the variable entirely, so this
+ * can never be switched off on the live site by a stray environment value. The
+ * platform always sets VERCEL_ENV, which is why it's checked first — a missing
+ * or mistyped APP_ENV can't be used to reach the escape hatch.
+ *
+ * Elsewhere it stays on unless SIGNUP_ACCESS_CODE_REQUIRED is exactly "false".
+ * Intended for a freshly reset environment that has no admin to mint the first
+ * code, and meant to be removed again once one exists.
+ */
+function accessCodeRequired(): boolean {
+  if (process.env.VERCEL_ENV === "production" || process.env.APP_ENV === "production") return true;
+  return process.env.SIGNUP_ACCESS_CODE_REQUIRED !== "false";
+}
+
 // Messages are written to be shown to a person, not just logged — the sign-up
 // form renders these verbatim, so "String must contain at least 8 character(s)"
 // isn't good enough.
@@ -23,7 +40,7 @@ const signupSchema = z.object({
     .string()
     .min(1, "Display name is required.")
     .max(100, "Display name must be 100 characters or fewer."),
-  accessCode: z.string().min(1, "An access code is required."),
+  accessCode: z.string().min(1, "An access code is required.").optional(),
 });
 
 /**
@@ -76,7 +93,7 @@ export async function POST(req: NextRequest) {
     // A missing/blank access code is a policy failure, not a malformed request — report
     // it as 403 with the contact instructions rather than burying it in field issues.
     const onlyAccessCodeFailed = parsed.error.issues.every((issue) => issue.path[0] === "accessCode");
-    if (onlyAccessCodeFailed) {
+    if (onlyAccessCodeFailed && accessCodeRequired()) {
       return NextResponse.json({ message: ACCESS_CODE_REQUIRED_MESSAGE }, { status: 403 });
     }
     return NextResponse.json({ message: "Invalid request body.", issues: parsed.error.issues }, { status: 400 });
@@ -97,12 +114,23 @@ export async function POST(req: NextRequest) {
 
   // Cheap pre-check so a bad code fails before we spend a bcrypt round on it. The
   // authoritative check is the conditional update inside the transaction below.
-  const codeRecord = await prisma.accessCode.findUnique({
-    where: { codeHash: hashAccessCode(accessCode) },
-    select: { id: true, usedAt: true },
-  });
-  if (!codeRecord || codeRecord.usedAt) {
-    return NextResponse.json({ message: ACCESS_CODE_REQUIRED_MESSAGE }, { status: 403 });
+  //
+  // codeRecord stays null when the requirement is suspended, which is what the
+  // transaction below keys off — there is then no code to consume.
+  let codeRecord: { id: string; usedAt: Date | null } | null = null;
+
+  if (accessCodeRequired()) {
+    if (!accessCode) {
+      return NextResponse.json({ message: ACCESS_CODE_REQUIRED_MESSAGE }, { status: 403 });
+    }
+
+    codeRecord = await prisma.accessCode.findUnique({
+      where: { codeHash: hashAccessCode(accessCode) },
+      select: { id: true, usedAt: true },
+    });
+    if (!codeRecord || codeRecord.usedAt) {
+      return NextResponse.json({ message: ACCESS_CODE_REQUIRED_MESSAGE }, { status: 403 });
+    }
   }
 
   const existing = await prisma.user.findFirst({
@@ -125,12 +153,14 @@ export async function POST(req: NextRequest) {
         select: { id: true, email: true, username: true, displayName: true },
       });
 
-      const consumed = await tx.accessCode.updateMany({
-        where: { id: codeRecord.id, usedAt: null },
-        data: { usedAt: new Date(), usedByUserId: created.id },
-      });
-      if (consumed.count === 0) {
-        throw new Error("ACCESS_CODE_ALREADY_USED");
+      if (codeRecord) {
+        const consumed = await tx.accessCode.updateMany({
+          where: { id: codeRecord.id, usedAt: null },
+          data: { usedAt: new Date(), usedByUserId: created.id },
+        });
+        if (consumed.count === 0) {
+          throw new Error("ACCESS_CODE_ALREADY_USED");
+        }
       }
 
       return created;
