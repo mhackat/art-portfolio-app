@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, signupLimit, RATE_LIMIT_WINDOW_MS } from "@/lib/rate-limit";
 import { hashAccessCode } from "@/lib/access-codes";
-
-const SIGNUP_LIMIT = 5;
-const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
 
 const ACCESS_CODE_REQUIRED_MESSAGE =
   "A valid one-time access code is required to sign up. Please contact hirehackett@gmail.com for an access code.";
@@ -90,7 +87,7 @@ export async function POST(req: NextRequest) {
   // Keyed by the email being signed up with, not the caller's IP — a shared/unknown
   // IP (e.g. every request from localhost in dev) would otherwise dump every
   // signup attempt into one bucket and rate-limit unrelated people out.
-  const rateLimit = await checkRateLimit("signup", email.toLowerCase(), SIGNUP_LIMIT, SIGNUP_WINDOW_MS);
+  const rateLimit = await checkRateLimit("signup", email.toLowerCase(), signupLimit(), RATE_LIMIT_WINDOW_MS);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { message: "Too many signup attempts. Please try again later." },
