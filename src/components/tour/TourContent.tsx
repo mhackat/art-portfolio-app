@@ -13,50 +13,63 @@ import { Reveal, useRevealOnScroll } from "@/components/motion/Reveal";
  * grows, update them here rather than in the copy below.
  */
 const STATS = {
-  endpoints: 30,
-  routeFiles: 26,
+  endpoints: 34,
+  covered: 30,
+  routeFiles: 29,
   models: 6,
   migrations: 5,
-  tests: 54,
-  suites: 7,
+  tests: 92,
+  suites: 8,
 };
 
 const SUITES = [
   {
-    id: "auth",
-    name: "Auth",
-    count: 9,
-    body: "Login and logout over the API: correct credentials issue a token, wrong ones don't, and a revoked session stops authenticating immediately.",
-  },
-  {
     id: "artworks",
     name: "Artworks",
     count: 17,
-    body: "The largest suite. Multipart uploads with a real image fixture, oversized-file rejection, ownership enforcement, and update/delete round-trips verified against what was actually sent.",
+    body: "The largest area. Multipart uploads with a real image fixture, oversized-file rejection, ownership enforcement, and update round-trips checked against what was actually sent rather than against a status code.",
+  },
+  {
+    id: "admin",
+    name: "Admin",
+    count: 28,
+    body: "The destructive surface: locking, forced passwords, reset links, invite codes, and deleting other people's work. All of it aimed at throwaway accounts the run creates and destroys, because none of it can be pointed at a shared one.",
+  },
+  {
+    id: "auth",
+    name: "Auth",
+    count: 10,
+    body: "Login, logout, and the invite-only signup. A revoked session stops authenticating immediately, and a failed login won't say whether it was the name or the password that was wrong.",
   },
   {
     id: "discovery",
     name: "Discovery",
     count: 9,
-    body: "Public read paths — search, listing, pagination, and fetching a profile by id or username, including the shapes returned for accounts that don't exist.",
+    body: "Public read paths — search, listing, pagination, profiles by id or username. Asserts what is absent as much as what is present: no ids, emails or password hashes in a public response.",
+  },
+  {
+    id: "feed",
+    name: "Browse feed",
+    count: 9,
+    body: "The shuffled gallery. Paging never repeats or drops a piece, a seed is reproducible, and a mangled cursor restarts instead of failing — regressions here wouldn't throw, they'd quietly lose work as someone scrolls.",
   },
   {
     id: "api-keys",
     name: "API keys",
     count: 7,
-    body: "Key lifecycle: creation returns the raw value exactly once, the list only ever exposes prefixes, and deletion provably stops the key from authenticating.",
+    body: "Key lifecycle: creation returns the raw value exactly once, the list only ever exposes prefixes, and deletion provably stops the key authenticating.",
   },
   {
     id: "bio",
     name: "Bio",
     count: 6,
-    body: "Runs serially by design — every test mutates the same field, so parallel execution would race a write in one test against a read-after-write assertion in another.",
+    body: "Runs serially by design — every test mutates the same field, so running them in parallel would race a write in one against a read-after-write assertion in another.",
   },
   {
-    id: "admin",
-    name: "Admin",
+    id: "uploads",
+    name: "Uploads",
     count: 6,
-    body: "Privileged endpoints, tagged so they can never run in CI. Covers the negative space: non-admins forbidden, unauthenticated requests rejected, self-deletion blocked.",
+    body: "An endpoint nothing in the app calls, but which is documented and reachable with a key. Follows the URL it hands back, instead of trusting that it looks right.",
   },
 ];
 
@@ -425,18 +438,18 @@ export default function TourContent() {
             {[
               {
                 n: "01",
-                h: "One rule, one place",
-                p: "Every mutating route asks the same question through the same function: may this caller act on this resource? Changing the rule means changing one file, and there is nowhere for a route to quietly disagree.",
+                h: "Two repositories",
+                p: `The application, and a test suite that lives apart from it and consumes it purely over HTTP. Nothing reaches inside the process or stubs the database, so a green run means the API behaves as promised to anyone holding a key — not merely that its internals agree with themselves.`,
               },
               {
                 n: "02",
-                h: "Docs that can't drift",
-                p: "The OpenAPI specification is generated at build time from annotations that live beside the handlers themselves. Documentation and behaviour ship together or not at all.",
+                h: `${STATS.covered} of ${STATS.endpoints} endpoints under test`,
+                p: "The four left out are left out deliberately: revoking every API key at once would end the suite's own session mid-run, and sweeping orphaned images would delete real files from shared storage. Coverage is a decision, not a percentage to maximise.",
               },
               {
                 n: "03",
-                h: "A gate, not a habit",
-                p: "The test suite lives in its own repository and runs as a required check. Reaching production isn't a matter of remembering to run the tests — it's mechanically impossible while they're red.",
+                h: "Every response readable",
+                p: "Each call the suite makes is captured — method, status and full body — and attached to the run's report. Reviewing a failure means reading what the server actually said, rather than re-running it locally and hoping it happens again.",
               },
             ].map((item, i) => (
               <Reveal key={item.n} delay={(i + 1) as 1 | 2 | 3}>
@@ -485,7 +498,7 @@ export default function TourContent() {
               {
                 k: "Media",
                 v: "S3-compatible object storage",
-                p: "Images live in object storage rather than the database, addressed by generated keys. A reconciliation job sweeps for files whose database records are gone, so deletes can't quietly leak storage.",
+                p: "Images live in object storage, not the database, addressed by generated keys. A reconciliation job sweeps for files whose database records are gone, so deletes can't quietly leak storage.",
               },
               {
                 k: "Sessions",
@@ -595,11 +608,11 @@ Accept: application/json
               },
               {
                 h: "Lockout that actually revokes",
-                p: "Repeated failed logins lock an account, and locking revokes active API keys rather than merely blocking future logins. Live sessions are re-checked per request, so access ends immediately.",
+                p: "Repeated failed logins lock an account, and locking revokes active API keys, not just future logins. Live sessions are re-checked per request, so access ends immediately.",
               },
               {
                 h: "Rate limiting by identity",
-                p: "Limits are keyed to the account being acted on rather than the caller's IP address — so users behind one shared address, including CI, can't exhaust each other's budget.",
+                p: "Limits are keyed to the account being acted on, not the caller's IP address — so users behind one shared address, including CI, can't exhaust each other's budget.",
               },
               {
                 h: "Invite-only registration",
@@ -636,19 +649,19 @@ Accept: application/json
           <div className="mb-16 grid gap-12 md:grid-cols-2 md:gap-16">
             <Reveal>
               <p className="text-lg leading-relaxed text-neutral-400">
-                {STATS.tests} automated tests live in a separate repository from the application, exercising it
-                purely over HTTP — the same way any other consumer would. Nothing reaches inside the process,
-                stubs the database, or trusts an internal function. If the suite passes, the API genuinely
-                behaves as promised from the outside.
+                {STATS.tests} tests across {STATS.suites} areas, written to fail for the right reason. Most of
+                them assert on what came back, not on a status code — that a public profile carries no
+                email, that a revoked key really stops working, that emptying a gallery leaves its owner
+                standing. A test that only checks for 200 passes right up until the day it matters.
               </p>
             </Reveal>
             <Reveal delay={1}>
               <ul className="space-y-4 text-sm leading-relaxed text-neutral-400">
                 {[
-                  "Authenticates once per run and shares the token, so the suite tests the rate limiter instead of tripping it.",
-                  "Suites that mutate shared state are marked serial; everything else runs in parallel.",
-                  "Privileged tests are tagged and excluded by tag, not by hoping a secret stays unset.",
-                  "Failures retain a full trace — request, response and timing — so a red CI run is diagnosable without a rerun.",
+                  "Logs in once per account per run and shares the session. An earlier version authenticated per worker and rate-limited itself off its own site.",
+                  "Areas that mutate shared state run serially; everything else runs in parallel.",
+                  "Admin tests run in the pipeline too — the most destructive surface shouldn't be the least covered.",
+                  "Failures keep a full trace: request, response, timing. A red run is diagnosable without reproducing it.",
                 ].map((line) => (
                   <li key={line} className="flex gap-3">
                     <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
@@ -719,9 +732,9 @@ Accept: application/json
           <div className="space-y-0">
             {[
               {
-                d: "The suite runs as one long-lived account and creates none of its own.",
-                w: "Fast, and there is no cleanup step to fail.",
-                c: "Tests that would prove one user cannot touch another's resources need a second account, so that boundary is verified by hand.",
+                d: "Destructive tests create a throwaway account, then destroy it.",
+                w: "Locking, forced passwords and mass deletion can be exercised for real, against something disposable.",
+                c: "Each one spends a single-use invite code, and a spent code can't be reclaimed — so those specs share one account per file instead of one per test.",
               },
               {
                 d: "Test data is never torn down after a run.",
@@ -731,12 +744,12 @@ Accept: application/json
               {
                 d: "Administrative access comes from an allowlist, not a role column.",
                 w: "No permission system to maintain before there is a second kind of privilege.",
-                c: "Granting access is a configuration change rather than something done in the product.",
+                c: "Granting access is a configuration change, not something done in the product.",
               },
               {
-                d: "Rate limits are keyed to the target identity rather than the caller's address.",
-                w: "Shared addresses — offices, CI runners — don't consume one another's budget.",
-                c: "A determined caller can spread attempts across many identities, so it is a throttle, not a shield.",
+                d: "Rate limits are keyed to the target identity, and relax outside production.",
+                w: "Shared addresses — offices, CI runners — don't consume one another's budget, and the suite isn't throttled by numbers meant for attackers.",
+                c: "A determined caller can spread attempts across many identities, so it is a throttle, not a shield. Production is identified by the platform's own signal, not a hand-set variable that could be mistyped.",
               },
             ].map((row, i) => (
               <Reveal key={row.d}>
@@ -767,11 +780,11 @@ Accept: application/json
 
           <div className="grid grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-3">
             {[
-              { v: STATS.tests, k: "Automated tests", s: "Across the API surface" },
-              { v: STATS.endpoints, k: "Endpoints", s: "All documented" },
-              { v: STATS.suites, k: "Test suites", s: "Organised by feature" },
-              { v: STATS.models, k: "Data models", s: "Relational, migrated" },
-              { v: STATS.migrations, k: "Migrations", s: "Applied on deploy" },
+              { v: STATS.tests, k: "Automated tests", s: `Across ${STATS.suites} areas` },
+              { v: STATS.endpoints, k: "Endpoints", s: `${STATS.covered} under test, 4 excluded on purpose` },
+              { v: STATS.routeFiles, k: "Route modules", s: "Public ones documented" },
+              { v: STATS.models, k: "Data models", s: `${STATS.migrations} versioned migrations` },
+              { v: 0, k: "Manual deploy steps", s: "Migrations and docs run themselves" },
               { v: 1, k: "Required gate", s: "Between a branch and production" },
             ].map((stat, i) => (
               <Reveal key={stat.k} delay={((i % 3) + 1) as 1 | 2 | 3}>
