@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth-options";
 import { isAdminUserId } from "@/lib/authz";
+import { formatDate } from "@/lib/format-date";
 import {
   listUsersPaginated,
   listLockedUsersPaginated,
@@ -34,10 +35,6 @@ type TabId = (typeof TABS)[number]["id"];
 
 function isTabId(value: unknown): value is TabId {
   return typeof value === "string" && TABS.some((t) => t.id === value);
-}
-
-function formatDate(value: Date) {
-  return value.toLocaleDateString();
 }
 
 export default async function AdminPage({

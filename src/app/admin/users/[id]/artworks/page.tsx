@@ -4,14 +4,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { isAdminUserId } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
+import { formatDate } from "@/lib/format-date";
 import DeleteArtworkButton from "@/components/admin/DeleteArtworkButton";
 import DeleteAllArtworksButton from "@/components/admin/DeleteAllArtworksButton";
 
 export const dynamic = "force-dynamic";
-
-function formatDate(value: Date) {
-  return value.toLocaleDateString();
-}
 
 /**
  * Moderation view for one user's gallery. Lives on its own page rather than in

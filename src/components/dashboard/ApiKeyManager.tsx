@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatDateTime } from "@/lib/format-date";
 
 type ApiKey = {
   id: string;
@@ -10,11 +11,6 @@ type ApiKey = {
   createdAt: string;
   lastUsedAt: string | null;
 };
-
-function formatDate(value: string | null) {
-  if (!value) return "Never";
-  return new Date(value).toLocaleString();
-}
 
 export default function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }) {
   const router = useRouter();
@@ -176,7 +172,8 @@ export default function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }
                   <span className="font-mono text-xs text-neutral-500">{key.keyPrefix}…</span>
                 </p>
                 <p className="mt-0.5 text-xs text-neutral-500">
-                  Created {formatDate(key.createdAt)} · Last used {formatDate(key.lastUsedAt)}
+                  Created {formatDateTime(key.createdAt)} · Last used{" "}
+                  {key.lastUsedAt ? formatDateTime(key.lastUsedAt) : "Never"}
                 </p>
               </div>
               <button

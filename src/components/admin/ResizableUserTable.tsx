@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { AdminUserRow, SortColumn, SortDirection } from "@/lib/admin";
+import { formatDate } from "@/lib/format-date";
 import DeleteUserButton from "@/components/admin/DeleteUserButton";
 import LockUserButton from "@/components/admin/LockUserButton";
 import AdminPasswordActions from "@/components/admin/AdminPasswordActions";
@@ -41,10 +42,6 @@ const DEFAULT_WIDTHS: Record<ColumnKey, number> = {
 
 const MIN_WIDTH = 60;
 const STORAGE_KEY = "admin-user-table-column-widths";
-
-function formatDate(value: Date) {
-  return value.toLocaleDateString();
-}
 
 export default function ResizableUserTable({
   users,
