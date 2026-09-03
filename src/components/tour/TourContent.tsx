@@ -9,20 +9,26 @@ import { Reveal, useRevealOnScroll } from "@/components/motion/Reveal";
  * shape rather than secrets — no environment names, hostnames, thresholds, or
  * credentials appear anywhere in this file.
  *
- * These are counted by hand from the two repositories; if the API or the suite
- * grows, update them here rather than in the copy below.
+ * These are counted by hand from the three repositories; if the API or either
+ * suite grows, update them here rather than in the copy below.
  */
 const STATS = {
   endpoints: 34,
   covered: 30,
-  routeFiles: 29,
+  routeFiles: 30,
   models: 6,
   migrations: 5,
-  tests: 92,
-  suites: 8,
+  apiTests: 92,
+  apiAreas: 8,
+  uiTests: 41,
+  uiAreas: 10,
 };
 
-const SUITES = [
+/** Both suites, counted together — the figure the headline numbers quote. */
+const TOTAL_TESTS = STATS.apiTests + STATS.uiTests;
+const TOTAL_AREAS = STATS.apiAreas + STATS.uiAreas;
+
+const API_SUITES = [
   {
     id: "artworks",
     name: "Artworks",
@@ -70,6 +76,73 @@ const SUITES = [
     name: "Uploads",
     count: 6,
     body: "An endpoint nothing in the app calls, but which is documented and reachable with a key. Follows the URL it hands back, instead of trusting that it looks right.",
+  },
+];
+
+/**
+ * The browser suite. Same discipline, different question: the API suite asks
+ * what the server promises, this one asks what a person actually gets.
+ */
+const UI_SUITES = [
+  {
+    id: "ui-health",
+    name: "Hydration",
+    count: 7,
+    body: "Every page is rendered on the server and handed to the browser to take over. Each one is checked to confirm the two renders agree — a page that quietly rebuilds itself on arrival still looks correct, so nothing but an assertion will tell you.",
+  },
+  {
+    id: "ui-admin",
+    name: "Admin",
+    count: 7,
+    body: "Who gets turned away, and what the console does for someone who doesn't. Signed out, redirected; signed in without privilege, refused rather than redirected; and for an admin, tabs that live in the URL so a view can be linked and survives a refresh.",
+  },
+  {
+    id: "ui-auth",
+    name: "Auth",
+    count: 4,
+    body: "The login form and where it takes you. The rejection path uses a name nobody owns rather than spending an account's lockout budget, and the message is identical either way — which is the point.",
+  },
+  {
+    id: "ui-home",
+    name: "Landing",
+    count: 4,
+    body: "The front page counts artists and works from the live database on every visit, so the assertion is that the figures are real and the featured pieces lead to whoever made them.",
+  },
+  {
+    id: "ui-nav",
+    name: "Navigation",
+    count: 4,
+    body: "The one component on every page. Signed out it offers the way in and nothing else; signed in it swaps to the account's own pages, and signing out genuinely ends the session rather than just repainting the bar.",
+  },
+  {
+    id: "ui-dashboard",
+    name: "Dashboard",
+    count: 4,
+    body: "Publishing an image through the real form, confirming it is servable and reaches the public profile, and taking it down again. Bio edits are put back as they were, and a generated key is revoked — each spec clears up after itself.",
+  },
+  {
+    id: "ui-browse",
+    name: "Gallery",
+    count: 3,
+    body: "The feed loads more as you scroll, then stops and asks, so an idle scroll can't pull down the whole gallery. Every tile leads to the artist who made it.",
+  },
+  {
+    id: "ui-profile",
+    name: "Profile",
+    count: 3,
+    body: "A public portfolio, and the full-size view — opened, then closed three ways: the button, the Escape key, and a click on the backdrop. A name nobody has answers 404.",
+  },
+  {
+    id: "ui-signup",
+    name: "Sign-up",
+    count: 3,
+    body: "The invite-only notice, the browser's own field validation catching a malformed name before the network is touched, and a code the server refuses. None of it spends a real invite.",
+  },
+  {
+    id: "ui-tour",
+    name: "This page",
+    count: 2,
+    body: "The page you are reading. Its figures animate up from zero and its sections arrive on scroll, so it is checked for both: that the counters land on real numbers, and that reaching the bottom genuinely reveals the end.",
   },
 ];
 
@@ -207,8 +280,15 @@ function Ticker({ reverse = false }: { reverse?: boolean }) {
   );
 }
 
-/** Horizontal suite rail — snap-scrolls natively on touch, drags with a mouse. */
-function SuiteRail() {
+/** Horizontal suite rail — snap-scrolls natively on touch, drags with a mouse.
+ *  Rendered once per suite, so the two read as the same kind of thing. */
+function SuiteRail({
+  suites,
+  prefix,
+}: {
+  suites: { id: string; name: string; count: number; body: string }[];
+  prefix: string;
+}) {
   const railRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ active: false, startX: 0, startScroll: 0 });
 
@@ -236,7 +316,7 @@ function SuiteRail() {
       <div className="mb-6 flex items-center gap-3 text-neutral-500">
         <Eyebrow>Drag / swipe</Eyebrow>
         <span className="h-px w-10 bg-neutral-700" />
-        <Eyebrow>{SUITES.length} suites</Eyebrow>
+        <Eyebrow>{suites.length} areas</Eyebrow>
       </div>
 
       <div
@@ -247,7 +327,7 @@ function SuiteRail() {
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
       >
-        {SUITES.map((suite, i) => (
+        {suites.map((suite, i) => (
           <article
             key={suite.id}
             className="flex w-[78vw] shrink-0 flex-col justify-between rounded-lg border border-neutral-800 bg-neutral-900 p-6 sm:w-[340px] sm:p-8"
@@ -255,7 +335,7 @@ function SuiteRail() {
             <div>
               <div className="flex items-baseline justify-between">
                 <Eyebrow className="text-neutral-500">
-                  S/{String(i + 1).padStart(3, "0")}
+                  {prefix}/{String(i + 1).padStart(3, "0")}
                 </Eyebrow>
                 <span className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -392,8 +472,8 @@ export default function TourContent() {
               <p className="max-w-xl text-lg leading-relaxed text-neutral-600">
                 This is a portfolio platform for artists — profiles, galleries, image uploads, a documented
                 public API. The product is the easy half. The half worth showing you is everything wrapped
-                around it: how requests are authorized, how the API contract stays honest, and the test suite
-                that has to go green before a single line reaches production.
+                around it: how requests are authorized, how the API contract stays honest, and the two test
+                suites — one over HTTP, one in a real browser — standing between a change and production.
               </p>
             </Reveal>
 
@@ -401,7 +481,7 @@ export default function TourContent() {
               <dl className="grid grid-cols-2 gap-x-6 gap-y-8 border-t border-neutral-200 pt-8 md:border-l md:border-t-0 md:pl-12 md:pt-0">
                 {[
                   { k: "Endpoints", v: STATS.endpoints },
-                  { k: "Automated tests", v: STATS.tests },
+                  { k: "Automated tests", v: TOTAL_TESTS },
                   { k: "Data models", v: STATS.models },
                   { k: "Migrations", v: STATS.migrations },
                 ].map((stat) => (
@@ -438,8 +518,8 @@ export default function TourContent() {
             {[
               {
                 n: "01",
-                h: "Two repositories",
-                p: `The application, and a test suite that lives apart from it and consumes it purely over HTTP. Nothing reaches inside the process or stubs the database, so a green run means the API behaves as promised to anyone holding a key — not merely that its internals agree with themselves.`,
+                h: "Three repositories",
+                p: `The application, and two test suites that live apart from it — one consuming the API purely over HTTP, one driving the site in a real browser. Neither reaches inside the process or stubs the database, so a green run means the product behaves as promised to whoever is holding a key or a mouse, not merely that its internals agree with themselves.`,
               },
               {
                 n: "02",
@@ -448,8 +528,8 @@ export default function TourContent() {
               },
               {
                 n: "03",
-                h: "Every response readable",
-                p: "Each call the suite makes is captured — method, status and full body — and attached to the run's report. Reviewing a failure means reading what the server actually said, rather than re-running it locally and hoping it happens again.",
+                h: "Every run readable",
+                p: "Each API call is captured — method, status and full body — and each browser test carries what the page itself reported. Both land in a written report. Reviewing a failure means reading what actually happened, rather than re-running it locally and hoping it happens again.",
               },
             ].map((item, i) => (
               <Reveal key={item.n} delay={(i + 1) as 1 | 2 | 3}>
@@ -642,26 +722,30 @@ Accept: application/json
           <SectionHeading
             index="005"
             kicker="Testing"
-            title="An independent suite that can veto a release."
+            title="Two independent suites, asking two different questions."
             dark
           />
 
           <div className="mb-16 grid gap-12 md:grid-cols-2 md:gap-16">
             <Reveal>
               <p className="text-lg leading-relaxed text-neutral-400">
-                {STATS.tests} tests across {STATS.suites} areas, written to fail for the right reason. Most of
-                them assert on what came back, not on a status code — that a public profile carries no
-                email, that a revoked key really stops working, that emptying a gallery leaves its owner
-                standing. A test that only checks for 200 passes right up until the day it matters.
+                {TOTAL_TESTS} tests across {TOTAL_AREAS} areas, in two repositories that live outside the
+                application. One consumes the API over HTTP and asks what the server promises. The other
+                drives a real browser and asks what a person actually gets. Both assert on what came back
+                rather than on a status code — that a public profile carries no email, that a revoked key
+                really stops working, that the modal closes when you press Escape. A test that only checks
+                for 200 passes right up until the day it matters.
               </p>
             </Reveal>
             <Reveal delay={1}>
               <ul className="space-y-4 text-sm leading-relaxed text-neutral-400">
                 {[
-                  "Logs in once per account per run and shares the session. An earlier version authenticated per worker and rate-limited itself off its own site.",
+                  "Each suite signs in once per account per run and shares the session, so a run performs exactly one login per identity rather than one per worker.",
                   "Areas that mutate shared state run serially; everything else runs in parallel.",
-                  "Admin tests run in the pipeline too — the most destructive surface shouldn't be the least covered.",
-                  "Failures keep a full trace: request, response, timing. A red run is diagnosable without reproducing it.",
+                  "Admin surfaces are covered in both — the most consequential area shouldn't be the least examined.",
+                  "The browser suite runs pinned away from the server's own timezone, so anything that renders differently for a reader elsewhere is visible rather than agreed with by coincidence.",
+                  "Failures keep a full trace: request, response, timing, and for the browser, a video and the console. A red run is diagnosable without reproducing it.",
+                  "Every run writes a report naming what passed, what failed, and what skipped and why.",
                 ].map((line) => (
                   <li key={line} className="flex gap-3">
                     <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
@@ -673,7 +757,27 @@ Accept: application/json
           </div>
 
           <Reveal>
-            <SuiteRail />
+            <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <h3 className="text-xl font-medium tracking-[-0.02em] text-white">Over HTTP</h3>
+              <Eyebrow className="text-neutral-500">
+                {STATS.apiTests} tests · no browser, no stubs
+              </Eyebrow>
+            </div>
+          </Reveal>
+          <Reveal>
+            <SuiteRail suites={API_SUITES} prefix="S" />
+          </Reveal>
+
+          <Reveal>
+            <div className="mb-4 mt-20 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <h3 className="text-xl font-medium tracking-[-0.02em] text-white">In a real browser</h3>
+              <Eyebrow className="text-neutral-500">
+                {STATS.uiTests} tests · real clicks, real rendering
+              </Eyebrow>
+            </div>
+          </Reveal>
+          <Reveal>
+            <SuiteRail suites={UI_SUITES} prefix="B" />
           </Reveal>
         </div>
       </section>
@@ -687,10 +791,10 @@ Accept: application/json
             <div className="tour-rule absolute left-0 top-0 hidden h-px w-full bg-neutral-900 md:block" />
             <ol className="grid gap-10 md:grid-cols-4 md:gap-6 md:pt-10">
               {[
-                { n: "01", h: "Open a pull request", p: "Any change targeting the main branch triggers the pipeline automatically." },
-                { n: "02", h: "Deploy a preview", p: "The change is built and published to a dedicated pre-production environment with its own isolated database." },
+                { n: "01", h: "Drive it in a browser", p: "Before a change is offered for review, the browser suite runs against it locally — real clicks, real rendering, on a real database." },
+                { n: "02", h: "Open a pull request", p: "Any change targeting the main branch triggers the pipeline automatically, and it is built and published to a dedicated pre-production environment with its own isolated database." },
                 { n: "03", h: "Run the suite", p: "The external test repository is checked out and run against that environment — real HTTP, real database, real storage." },
-                { n: "04", h: "Gate the merge", p: "The result is a required status check. While it's red the merge button is disabled, so production is protected by the pipeline rather than by discipline." },
+                { n: "04", h: "Gate the merge", p: "The result is a required status check. Until it is green the merge button stays disabled, so production is protected by the pipeline rather than by discipline." },
               ].map((step, i) => (
                 <Reveal key={step.n} delay={(i + 1) as 1 | 2 | 3 | 4}>
                   <li className="relative">
@@ -704,16 +808,28 @@ Accept: application/json
             </ol>
           </div>
 
-          <Reveal>
-            <div className="mt-16 rounded-lg border border-neutral-200 bg-neutral-50 p-6 sm:p-8">
-              <Eyebrow className="text-neutral-400">Also automated</Eyebrow>
-              <p className="mt-3 max-w-3xl leading-relaxed text-neutral-700">
-                Database migrations are applied as part of the deploy step, and the API specification is
-                regenerated on every build. Neither is a manual checklist item, because manual checklist items
-                are the ones that get skipped at 6pm on a Friday.
-              </p>
-            </div>
-          </Reveal>
+          <div className="mt-16 grid gap-6 md:grid-cols-2">
+            <Reveal>
+              <div className="h-full rounded-lg border border-neutral-200 bg-neutral-50 p-6 sm:p-8">
+                <Eyebrow className="text-neutral-400">Also automated</Eyebrow>
+                <p className="mt-3 leading-relaxed text-neutral-700">
+                  Database migrations are applied as part of the deploy step, and the API specification is
+                  regenerated on every build. Neither is a manual checklist item, because manual checklist
+                  items are the ones that get skipped at 6pm on a Friday.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delay={1}>
+              <div className="h-full rounded-lg border border-neutral-200 bg-neutral-50 p-6 sm:p-8">
+                <Eyebrow className="text-neutral-400">Two gates, two shapes</Eyebrow>
+                <p className="mt-3 leading-relaxed text-neutral-700">
+                  The pipeline gate is the API suite: fast, headless, and about the contract. The browser
+                  suite is the pass before that, run against a local instance while the change is still in
+                  hand — the place where a rendering problem is cheapest to find and to fix.
+                </p>
+              </div>
+            </Reveal>
+          </div>
         </div>
       </section>
 
@@ -737,9 +853,9 @@ Accept: application/json
                 c: "Each one spends a single-use invite code, and a spent code can't be reclaimed — so those specs share one account per file instead of one per test.",
               },
               {
-                d: "Test data is never torn down after a run.",
-                w: "You can open the app afterwards and see exactly what the run did.",
-                c: "Data accumulates over time and is pruned manually.",
+                d: "The two suites take opposite positions on clearing up after themselves.",
+                w: "The API suite leaves what it created, so you can open the app afterwards and see exactly what a run did. The browser suite removes what it publishes, because an upload there is a real image in real storage on every run.",
+                c: "Two conventions to hold in mind rather than one, each written down beside the specs it governs.",
               },
               {
                 d: "Administrative access comes from an allowlist, not a role column.",
@@ -749,7 +865,7 @@ Accept: application/json
               {
                 d: "Rate limits are keyed to the target identity, and relax outside production.",
                 w: "Shared addresses — offices, CI runners — don't consume one another's budget, and the suite isn't throttled by numbers meant for attackers.",
-                c: "A determined caller can spread attempts across many identities, so it is a throttle, not a shield. Production is identified by the platform's own signal, not a hand-set variable that could be mistyped.",
+                c: "Scoped on purpose to one identity's attempts rather than to distributed volume. Production is identified by the platform's own signal rather than a hand-set variable, so the tighter numbers cannot be switched off by a typo.",
               },
             ].map((row, i) => (
               <Reveal key={row.d}>
@@ -780,9 +896,9 @@ Accept: application/json
 
           <div className="grid grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-3">
             {[
-              { v: STATS.tests, k: "Automated tests", s: `Across ${STATS.suites} areas` },
+              { v: TOTAL_TESTS, k: "Automated tests", s: `Across ${TOTAL_AREAS} areas, in two suites` },
               { v: STATS.endpoints, k: "Endpoints", s: `${STATS.covered} under test, 4 excluded on purpose` },
-              { v: STATS.routeFiles, k: "Route modules", s: "Public ones documented" },
+              { v: STATS.uiTests, k: "Browser tests", s: `${STATS.uiAreas} areas driven in real Chromium` },
               { v: STATS.models, k: "Data models", s: `${STATS.migrations} versioned migrations` },
               { v: 0, k: "Manual deploy steps", s: "Migrations and docs run themselves" },
               { v: 1, k: "Required gate", s: "Between a branch and production" },
